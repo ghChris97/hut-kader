@@ -2,7 +2,9 @@
 // Der API-Schluessel liegt als Secret GEMINI_API_KEY im Projekt und erreicht nie den Browser.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-2.5-flash";
+// Erstes verfuegbares Modell gewinnt; ein abgeschaltetes Modell wird uebersprungen.
+const MODELS = (Deno.env.get("GEMINI_MODEL") ?? "gemini-3.8-flash,gemini-3.7-flash,gemini-3.5-flash,gemini-3.5-flash-lite")
+  .split(",").map((m) => m.trim()).filter(Boolean);
 const ALLOWED = ["https://ghchris97.github.io", "http://localhost:8765", "http://127.0.0.1:8765"];
 const MAX_BYTES = 6_000_000;
 
@@ -58,25 +60,34 @@ Deno.serve(async (req) => {
   const mime = /^image\/(jpeg|png|webp)$/.test(String(body.mime)) ? String(body.mime) : "image/jpeg";
   if (!image || image.length > MAX_BYTES) return json({ error: "Bild fehlt oder ist zu groß." }, 400, h);
 
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ inline_data: { mime_type: mime, data: image } }, { text: PROMPT }] }],
-      generationConfig: { temperature: 0, responseMimeType: "application/json", responseSchema: SCHEMA },
-    }),
-  });
-  const out = await res.json().catch(() => null);
-  if (!res.ok) {
-    const msg = out?.error?.message ?? `HTTP ${res.status}`;
-    const busy = res.status === 429;
+  let res: Response | null = null, out: any = null, model = "";
+  for (const m of MODELS) {
+    model = m;
+    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ inline_data: { mime_type: mime, data: image } }, { text: PROMPT }] }],
+        generationConfig: { temperature: 0, responseMimeType: "application/json", responseSchema: SCHEMA },
+      }),
+    });
+    out = await res.json().catch(() => null);
+    const msg = String(out?.error?.message ?? "");
+    // abgeschaltet, ueberlastet oder Kontingent dieses Modells leer: naechstes Modell probieren
+    const skip = res.status === 404 || res.status === 503 || res.status === 429 ||
+      /no longer available|not found|not supported|high demand|overloaded|unavailable|quota/i.test(msg);
+    if (!skip) break;
+  }
+  if (!res || !res.ok) {
+    const msg = out?.error?.message ?? `HTTP ${res?.status}`;
+    const busy = res?.status === 429;
     return json({ error: busy ? "Das kostenlose Gemini-Kontingent ist gerade ausgeschöpft. Versuch es später noch einmal." : "Gemini-Fehler: " + msg }, busy ? 429 : 502, h);
   }
   const text = out?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
   try {
     const parsed = JSON.parse(text);
     const cards = Array.isArray(parsed?.cards) ? parsed.cards : [];
-    return json({ cards, model: MODEL }, 200, h);
+    return json({ cards, model }, 200, h);
   } catch {
     return json({ error: "Gemini hat keine lesbare Liste geliefert." }, 502, h);
   }
