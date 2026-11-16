@@ -129,6 +129,18 @@ input:focus,select:focus,textarea:focus{border-color:var(--line2);outline:none}
 .players{display:grid;gap:8px;grid-template-columns:repeat(3,1fr)}
 .players.n5{grid-template-columns:repeat(5,1fr)} .players.n4{grid-template-columns:repeat(4,1fr)}
 .kgrid{margin-bottom:6px}
+.kt{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.kt img{-webkit-user-drag:none;pointer-events:none}
+.kt.selmode .pl{opacity:.55;transition:opacity .15s,transform .15s}
+.kt.sel .pl{opacity:1;transform:scale(.96)}
+.kt.sel .pl .img{outline:3px solid var(--ice);outline-offset:-3px}
+.kchk{position:absolute;top:6px;left:6px;z-index:2;width:24px;height:24px;border-radius:50%;border:2px solid #fff;background:rgba(0,0,0,.55);display:grid;place-items:center;color:var(--bg)}
+.kt.sel .kchk{background:var(--ice);border-color:var(--ice)}
+.kchk svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:3;stroke-linecap:round}
+.selbar{position:fixed;left:8px;right:8px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:25;display:flex;gap:8px;align-items:center;padding:10px 12px;background:var(--surface);border:1px solid var(--line);box-shadow:0 10px 30px -8px rgba(0,0,0,.8)}
+.selbar span{flex:1}
+.btn.danger{background:#d6453d;border-color:#d6453d;color:#fff}
+.btn[disabled]{opacity:.45}
 .kt{position:relative;min-width:0}
 .kt .kxf{display:flex;gap:3px;margin-top:4px}
 .kt .kxf img{width:22px;height:22px}
@@ -669,13 +681,17 @@ function viewKader(){
     var list=o.filter(function(c){return g[1].indexOf(c.pos)>=0;}).sort(function(a,b){return g[1].indexOf(a.pos)-g[1].indexOf(b.pos)||b.ovr-a.ovr;});
     h+='<h2>'+g[0]+' <span class="count">'+list.length+'</span></h2>'+(list.length?'<div class="players kgrid">'+list.map(kTile).join('')+'</div>':'<p class="mute small">Noch keine Karte.</p>');
   });
+  if(UI.sel){ var n=Object.keys(UI.sel).length;
+    h+='<div class="selbar" role="toolbar"><span><b>'+n+'</b> ausgewählt</span><button class="btn ghost sm" id="sel-all">Alle</button><button class="btn ghost sm" id="sel-cancel">Abbrechen</button><button class="btn sm danger" id="sel-del"'+(n?'':' disabled')+'>Entfernen</button></div>'; }
+  else if(!SHARED&&o.length) h+='<p class="small mute" style="margin-top:12px">Tipp: Karte gedrückt halten, um mehrere auszuwählen und zu entfernen.</p>';
   view.innerHTML=h;
 }
 
 function kTile(c){
   var k=key(c), xs=(c.xf||[]).map(function(x){var i=D.xf[x]; return xfLogo[x]?'<img src="'+esc(D.meta.img_base+xfLogo[x])+'" alt="'+esc(i?nice(i.n)+' '+i.t:'X-Factor')+'" title="'+esc(i?nice(i.n)+' · '+i.t+' · '+i.ap+' AP':'')+'" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">':'';}).join('');
-  return '<div class="kt">'+plHtml(c,c.pos+(c.hand?' '+(c.hand==='L'?'L':'R'):''))+(xs?'<div class="kxf">'+xs+'</div>':'')+
-    (SHARED?'':'<button class="kdel" data-rm="'+k+'" aria-label="'+esc(nice(c.n))+' aus dem Kader entfernen">'+IC.x+'</button>')+'</div>';
+  var on=UI.sel&&UI.sel[k];
+  return '<div class="kt'+(UI.sel?' selmode':'')+(on?' sel':'')+'" data-kt="'+k+'">'+(UI.sel?'<span class="kchk" aria-hidden="true">'+(on?IC.check:'')+'</span>':'')+plHtml(c,c.pos+(c.hand?' '+(c.hand==='L'?'L':'R'):''))+(xs?'<div class="kxf">'+xs+'</div>':'')+
+    (SHARED||UI.sel?'':'<button class="kdel" data-rm="'+k+'" aria-label="'+esc(nice(c.n))+' aus dem Kader entfernen">'+IC.x+'</button>')+'</div>';
 }
 
 /* ---------- Reihen ---------- */
@@ -1214,6 +1230,7 @@ function viewImport(){
 /* ---------- Steuerung ---------- */
 function render(){
   var t=tab();
+  if(t!=='kader') UI.sel=null;
   Array.prototype.forEach.call(document.querySelectorAll('nav a'),function(a){ if(a.dataset.tab===t) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current'); });
   count();
   if(!D) return;
@@ -1237,7 +1254,20 @@ function toggle(k){
 }
 function lineupInfo(r){return 'Ø '+r.totals.avg.toFixed(1)+' · +'+r.totals.ap+' AP · '+money(r.totals.sal);}
 
+var LP={t:0,x:0,y:0,fired:false};
+document.addEventListener('pointerdown',function(e){
+  var kt=e.target.closest&&e.target.closest('[data-kt]'); if(!kt||SHARED||tab()!=='kader'||e.target.closest('.kdel')) return;
+  LP.x=e.clientX; LP.y=e.clientY; clearTimeout(LP.t);
+  LP.t=setTimeout(function(){ LP.fired=true; if(!UI.sel) UI.sel={}; UI.sel[kt.dataset.kt]=1; try{navigator.vibrate&&navigator.vibrate(25);}catch(_){}
+    viewKader(); },480);
+});
+document.addEventListener('pointermove',function(e){ if(LP.t&&(Math.abs(e.clientX-LP.x)>10||Math.abs(e.clientY-LP.y)>10)){clearTimeout(LP.t);LP.t=0;} });
+['pointerup','pointercancel'].forEach(function(ev){document.addEventListener(ev,function(){clearTimeout(LP.t);LP.t=0; if(LP.fired) setTimeout(function(){LP.fired=false;},400);});});
+document.addEventListener('contextmenu',function(e){ if(e.target.closest&&e.target.closest('[data-kt]')) e.preventDefault(); });
 document.addEventListener('click',function(e){
+  if(LP.fired){ LP.fired=false; e.preventDefault(); e.stopPropagation(); return; }
+  var kt=UI.sel&&e.target.closest('[data-kt]');
+  if(kt){ e.preventDefault(); var kk=kt.dataset.kt; if(UI.sel[kk]) delete UI.sel[kk]; else UI.sel[kk]=1; viewKader(); return; }
   var cardEl=e.target.closest('[data-card]');
   if(cardEl&&!e.target.closest('[data-tg],[data-rm],input,select')){ e.preventDefault(); if(document.getElementById('gmfull')&&document.getElementById('gmfull').classList.contains('on')) closeFull(); openCard(cardEl.dataset.card); return; }
   var b=e.target.closest('button'); if(!b) return;
@@ -1248,6 +1278,12 @@ document.addEventListener('click',function(e){
   if(d.close){closeCard(); return;}
   if(d.tg){ if(!SHARED&&isOwnedKey(d.tg)&&!askRemove(d.tg)) return; if(toggle(d.tg)){ if(tab()==='karten') results(); else render(); refreshSheet(); } return; }
   if(d.rm){ if(!askRemove(d.rm)) return; toggle(d.rm); render(); return;}
+  if(b.id==='sel-cancel'){UI.sel=null; viewKader(); return;}
+  if(b.id==='sel-all'){owned().forEach(function(c){UI.sel[key(c)]=1;}); viewKader(); return;}
+  if(b.id==='sel-del'){ var ks=Object.keys(UI.sel); if(!ks.length) return;
+    if(!window.confirm(ks.length+(ks.length===1?' Karte':' Karten')+' wirklich aus dem Kader entfernen?\n\n'+ks.map(function(k){var c=byKey[k]; return c?nice(c.n)+' ('+c.ovr+')':k;}).join(', '))) return;
+    ks.forEach(function(k){var i=V.owned.indexOf(k); if(i>=0){V.owned.splice(i,1); delete V.locks[k]; delete V.bans[k];}});
+    UI.sel=null; UI.up=null; RES=null; save(); render(); toast(ks.length+' entfernt'); return; }
   if(d.cmp){
     if(UI.cmp.indexOf(d.cmp)<0){ if(UI.cmp.length>=2) UI.cmp.shift(); UI.cmp.push(d.cmp); }
     if(UI.cmp.length===2){closeCard(); setTimeout(function(){location.hash='#analyse';},50);} else toast('Gemerkt. Jetzt die zweite Karte öffnen.');
