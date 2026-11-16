@@ -251,8 +251,14 @@ body.sheet-open{overflow:hidden}
 .gm .bon span{display:flex;align-items:center;gap:.6cqw;border-left:.3cqw solid #33c8f0;padding:.2cqw 0 .2cqw .8cqw;background:none;border-radius:0;font:700 2.35cqw/1 var(--display);letter-spacing:.01em;white-space:nowrap}
 .gm .bon .o{color:#7fe4ff} .gm .bon .s{color:#d9f3b4} .gm .bon .a{color:#b9c2ff}
 .gm .bon svg{width:1.7cqw;height:2.2cqw;flex:none}
-.gm .band{align-self:center;height:34%;margin-top:3cqw;z-index:0;pointer-events:none;
-  background:linear-gradient(90deg,transparent 0%,rgba(60,180,235,.30) 10%,rgba(150,228,255,.62) 24%,rgba(70,190,240,.22) 45%,rgba(70,190,240,.16) 70%,rgba(90,200,245,.42) 90%,transparent 100%);filter:blur(1.1cqw)}
+/* Lichtstreifen hinter einer Reihe mit Bonus, je Bonus eine Farbe wie im Spiel */
+.gm .band{align-self:center;margin-top:3.2cqw;height:62%;z-index:0;pointer-events:none;position:relative;display:flex;flex-direction:column;justify-content:center;gap:1.6cqw}
+.gm .band:before{content:"";position:absolute;inset:8% -2% 8% 0;background:radial-gradient(60% 50% at 35% 50%,rgba(80,190,240,.28),transparent 75%);filter:blur(1.4cqw)}
+.gm .band i{display:block;height:1.1cqw;border-radius:1cqw;filter:blur(.45cqw);opacity:.95;
+  background:linear-gradient(90deg,transparent 0%,var(--c) 8%,var(--c2) 26%,var(--c) 55%,var(--c2) 88%,transparent 100%)}
+.gm .band i.o{--c:rgba(80,205,255,.55);--c2:rgba(170,240,255,.95)}
+.gm .band i.s{--c:rgba(190,235,120,.5);--c2:rgba(225,250,190,.9)}
+.gm .band i.a{--c:rgba(150,140,255,.5);--c2:rgba(205,200,255,.9)}
 .gm .grp{display:contents}
 .gm .cell{position:relative}
 .gm-row{display:contents}
@@ -288,7 +294,7 @@ body.sheet-open{overflow:hidden}
 <input type="file" id="file-shot" accept="image/*" multiple class="hide" aria-label="Screenshots auswählen">
 <input type="file" id="file-cam" accept="image/*" capture="environment" class="hide" aria-label="Foto aufnehmen">
 
-<script src="engine.js"></script>
+<script src="engine.js?v=__BUILD__"></script>
 <script>
 (function(){
 'use strict';
@@ -598,6 +604,11 @@ function arrange(players,order){
   return out;
 }
 function hasBonus(l){return l&&(l.boosts.overall||l.boosts.salary||l.boosts.ability_points);}
+function bandHtml(l,row,cols){
+  if(!hasBonus(l)) return '';
+  var b=l.boosts;
+  return '<div class="band" style="grid-row:'+row+';grid-column:'+cols+'">'+(b.overall?'<i class="o"></i>':'')+(b.salary?'<i class="s"></i>':'')+(b.ability_points?'<i class="a"></i>':'')+'</div>';
+}
 function overviewHtml(r){
   var FP=['LA','C','RA'], DP=['LV','RV'];
   var cap=r.totals&&r.totals.captain&&r.totals.captain.active?r.totals.captain.cap.k+r.totals.captain.cap.id:'';
@@ -605,13 +616,13 @@ function overviewHtml(r){
   for(var i=0;i<4;i++){
     var f=r.forwards[i], fp=f?arrange(f.players,['LW','C','RW']):[];
     h+='<div class="side" style="grid-row:'+(i+1)+';grid-column:1">Angriff '+(i+1)+'</div>';
-    if(hasBonus(f)) h+='<div class="band" style="grid-row:'+(i+1)+';grid-column:1 / 6"></div>';
+    h+=bandHtml(f,i+1,'1 / 6');
     FP.forEach(function(pos,j){ h+='<div style="grid-row:'+(i+1)+';grid-column:'+(j+2)+'">'+slotHtml(fp[j],pos,f&&f.boosts.overall,cap)+'</div>'; });
     h+='<div style="grid-row:'+(i+1)+';grid-column:5;align-self:center">'+bonusMini(f&&f.boosts)+'</div>';
     h+='<div class="side" style="grid-row:'+(i+1)+';grid-column:6">'+(i<3?'Verteidigung '+(i+1):'Goalies')+'</div>';
     if(i<3){
       var d=r.defense[i], dp=d?HUT.sidesD(d.players,S.dHand):[];
-      if(hasBonus(d)) h+='<div class="band" style="grid-row:'+(i+1)+';grid-column:6 / 10"></div>';
+      h+=bandHtml(d,i+1,'6 / 10');
       DP.forEach(function(pos,j){ h+='<div style="grid-row:'+(i+1)+';grid-column:'+(j+7)+'">'+slotHtml(dp[j],pos,d&&d.boosts.overall,cap)+'</div>'; });
       h+='<div style="grid-row:'+(i+1)+';grid-column:9;align-self:center">'+bonusMini(d&&d.boosts)+'</div>';
     }else{
@@ -990,7 +1001,12 @@ function render(){
   Array.prototype.forEach.call(document.querySelectorAll('nav a'),function(a){ if(a.dataset.tab===t) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current'); });
   count();
   if(!D) return;
-  ({karten:viewKarten,kader:viewKader,reihen:viewReihen,analyse:viewAnalyse,setup:viewSetup})[t]();
+  try{
+    if(typeof HUT.sidesD!=='function') throw new Error('Veraltete App-Dateien im Speicher');
+    ({karten:viewKarten,kader:viewKader,reihen:viewReihen,analyse:viewAnalyse,setup:viewSetup})[t]();
+  }catch(err){
+    view.innerHTML='<div class="center"><h2>Diese Ansicht konnte nicht geladen werden</h2><p class="mute">'+esc(err&&err.message)+'</p><button class="btn" id="hard-reload">App neu laden</button></div>';
+  }
 }
 function toggle(k){
   if(SHARED){toast('Geteilter Kader: nur ansehen'); return false;}
@@ -1023,6 +1039,9 @@ document.addEventListener('click',function(e){
   if(d.sv!==undefined){UI.saved=+d.sv; viewReihen(); view.scrollTop=0; return;}
   if(d.svdel!==undefined){V.lineups.splice(+d.svdel,1); UI.saved=-1; save(); viewReihen(); return;}
   switch(b.id){
+    case 'hard-reload':
+      try{ (window.caches?caches.keys():Promise.resolve([])).then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k);}));}).then(function(){ location.reload(); }); }catch(err){ location.reload(); }
+      break;
     case 'f-new': UI.onlyNew=!UI.onlyNew; UI.limit=40; viewKarten(); break;
     case 'f-mine': UI.onlyMine=!UI.onlyMine; UI.limit=40; viewKarten(); break;
     case 'f-more': UI.more=!UI.more; viewKarten(); break;
@@ -1094,7 +1113,7 @@ document.getElementById('file-cam').addEventListener('change',function(){runImpo
 window.addEventListener('hashchange',function(){ if(CARD){CARD=null; sheet.classList.remove('on'); document.body.classList.remove('sheet-open');} UI.saved=-1; if(tab()!=='kader'&&UI.imp&&UI.imp.step!=='scan') UI.imp=null; render(); view.scrollTop=0;});
 
 load(); render();
-fetch('hut.json').then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }).then(function(d){
+fetch('hut.json?v=__BUILD__').then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }).then(function(d){
   D=d; D.xf=D.xf||{}; D.captains=D.captains||[];
   VER=String(d.meta.version||((d.meta.img_base||'').match(/NHL(\d+)/)||[])[1]||'');
   var v=VD[VER]||{};

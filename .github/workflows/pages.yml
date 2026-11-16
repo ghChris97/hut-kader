@@ -32,6 +32,9 @@ jobs:
         run: |
           python3 scraper/scrape.py data
           cp data/hut.json app/hut.json
+          # Versionskennung in alle Dateiverweise, damit nie alte und neue Dateien gemischt werden
+          BUILD="${GITHUB_SHA::7}-$(date -u +%y%m%d%H%M)"
+          sed -i "s/__BUILD__/$BUILD/g" app/index.html app/sw.js
       - name: Optimierer testen
         run: node tests/test_engine.js "$PWD"
       - uses: actions/configure-pages@v5

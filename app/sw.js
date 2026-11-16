@@ -1,7 +1,8 @@
 /* Macht die App installierbar und offline nutzbar.
-   Immer zuerst das Netz fragen (damit Updates sofort ankommen), sonst die letzte gespeicherte Fassung. */
-var CACHE = 'hutkader-v7';
-var SHELL = ['./', 'index.html', 'engine.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
+   Immer zuerst das Netz fragen und dabei den Browser-Cache umgehen, damit alle Dateien
+   aus derselben Version stammen. Nur ohne Netz kommt die zuletzt gespeicherte Fassung. */
+var CACHE = 'hutkader-__BUILD__';
+var SHELL = ['./', 'index.html', 'engine.js?v=__BUILD__', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); }));
@@ -13,10 +14,9 @@ self.addEventListener('activate', function (e) {
 });
 self.addEventListener('fetch', function (e) {
   var url = new URL(e.request.url);
-  // Nur eigene Dateien. Kartenbilder der Quelle laufen ueber den normalen Browser-Cache.
   if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
   e.respondWith(
-    fetch(e.request).then(function (res) {
+    fetch(e.request, { cache: 'no-store' }).then(function (res) {
       if (res && res.ok) { var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(e.request, copy); }); }
       return res;
     }).catch(function () {
