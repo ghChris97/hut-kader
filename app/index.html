@@ -318,7 +318,7 @@ var VD={}, VER='', V={owned:[],locks:{},bans:{},lineups:[],xfOn:{}};  /* Daten j
 var SHARED=null;   /* geteilter Kader aus einem Link: nur ansehen */
 var RES=null;      /* letzte Optimierung, wird bei jeder Aenderung verworfen */
 var UI={q:'', pos:'', type:'', min:'', sort:'ovr', limit:40, open:null, stat:{}, xf:'', hgt:'', hand:'', onlyNew:false, onlyMine:false,
-        more:false, cmp:[], saved:-1, up:null, upMin:'', imp:null};
+        more:false, cmp:[], saved:-1, up:null, upMin:'', upMode:'bonus', upMax:'84', upTol:'3', imp:null};
 var PRIO={bal:{ovr:1,ap:0.5,sal:0.25,label:'Ausgewogen'}, ovr:{ovr:1,ap:0.05,sal:0.02,label:'Stärkste Reihen'},
           ap:{ovr:1,ap:2,sal:0.25,label:'Möglichst viele Ability Points'}, sal:{ovr:1,ap:0.5,sal:1.5,label:'Möglichst viel Cap-Bonus'}};
 var SA=['ACC','AGI','BAL','END','SPD','SSA','SSP','WSA','WSP','DEK','OAW','HAE','PAS','PC','CHK','STR','AGR','DUR','FS','DAW','BLK','SCH','FO','DIS'];
@@ -830,23 +830,35 @@ function cmpHtml(){
 }
 function upHtml(){
   if(!owned().length) return '<p class="small mute">Lege zuerst deinen Kader an.</p>';
-  var h='<div class="two" style="grid-template-columns:1fr auto;margin-bottom:8px"><select id="up-min" aria-label="Mindest-Overall der Vorschläge">'+opt('','Alle Karten prüfen',UI.upMin)+[84,86,88,90].map(function(v){return opt(v,'Nur Karten ab '+v+' OVR',UI.upMin);}).join('')+'</select><button class="btn sm" id="up-run">Berechnen</button></div>';
+  var bonus=UI.upMode!=='ovr';
+  var h='<div class="seg" role="group" aria-label="Art der Vorschläge"><button id="up-m-bonus" aria-pressed="'+bonus+'">Mehr Boni</button><button id="up-m-ovr" aria-pressed="'+!bonus+'">Stärkste Karten</button></div>';
+  if(bonus){
+    h+='<div class="two" style="margin-bottom:10px"><select id="up-max" aria-label="Höchste OVR der Vorschläge">'+opt('','Jede Stärke',UI.upMax)+[78,80,82,84,86,88].map(function(v){return opt(v,'Höchstens '+v+' OVR',UI.upMax);}).join('')+'</select>'+
+      '<select id="up-tol" aria-label="Wie viel schwächer darf die Karte sein">'+[[0,'Nicht schwächer'],[2,'Max. 2 schwächer'],[3,'Max. 3 schwächer'],[5,'Max. 5 schwächer'],[8,'Max. 8 schwächer']].map(function(o){return opt(o[0],o[1],UI.upTol);}).join('')+'</select></div>';
+  }else{
+    h+='<div style="margin-bottom:10px"><select id="up-min" aria-label="Mindest-Overall der Vorschläge">'+opt('','Alle Karten prüfen',UI.upMin)+[84,86,88,90].map(function(v){return opt(v,'Nur Karten ab '+v+' OVR',UI.upMin);}).join('')+'</select></div>';
+  }
+  h+='<p><button class="btn" id="up-run" style="width:100%">Vorschläge berechnen</button></p>';
   if(UI.up==='run') return h+'<p class="mute">Rechne alle Karten durch …</p>';
-  if(!UI.up) return h+'<p class="small mute">Prüft jede Karte, die du nicht hast: Wo würde sie in deiner aktuellen Aufstellung am meisten bringen, mit allen Combos?</p>';
-  if(!UI.up.length) return h+'<p class="note">Keine einzelne Karte verbessert deine Aufstellung'+(result().capBase?' innerhalb des Caps':'')+'.</p>';
+  if(!UI.up) return h+'<p class="small mute">'+(bonus?'Sucht Karten, die in deiner Aufstellung neue Combos oder den Captain-Bonus freischalten, ohne viel schwächer zu sein als der Spieler, den sie ersetzen. Oben stehen die Karten mit den meisten neuen Boni, bei gleichem Bonus die mit niedrigerer OVR, weil die meist leichter zu bekommen sind. Je Spieler steht nur eine Version da.':'Prüft jede Karte, die du nicht hast: Wo würde sie in deiner aktuellen Aufstellung am meisten bringen, mit allen Combos?')+'</p>';
+  if(!UI.up.length) return h+'<p class="note">'+(bonus?'Keine Karte schaltet mit diesen Einstellungen einen neuen Bonus frei. Lass mehr Abstand zu oder heb die OVR-Grenze an.':'Keine einzelne Karte verbessert deine Aufstellung'+(result().capBase?' innerhalb des Caps':'')+'.')+'</p>';
   return h+'<div class="list">'+UI.up.map(function(u){
     var c=u.card, g=[];
-    if(u.gain.overall) g.push('<span class="pill o">'+(u.gain.overall>0?'+':'')+u.gain.overall+' OVR</span>');
-    if(u.gain.ability_points) g.push('<span class="pill a">'+(u.gain.ability_points>0?'+':'')+u.gain.ability_points+' AP</span>');
-    if(u.gain.salary) g.push('<span class="pill s">'+(u.gain.salary>0?'+':'−')+'$'+Math.abs(u.gain.salary)+'M</span>');
+    if(u.gain.overall) g.push('<span class="pill o">'+(u.gain.overall>0?'+':'')+u.gain.overall+' GES</span>');
+    if(u.gain.ability_points) g.push('<span class="pill a">'+(u.gain.ability_points>0?'+':'')+u.gain.ability_points+' FP</span>');
+    if(u.gain.salary) g.push('<span class="pill s">'+(u.gain.salary>0?'+':'−')+String(Math.abs(u.gain.salary).toFixed(1)).replace('.',',')+' M$</span>');
+    if(u.capGain) g.push('<span class="pill a">Captain +'+u.capGain+'</span>');
+    var diff=u.diff!=null?u.diff:(c.ovr-u.replaces.ovr), dtxt=Math.abs(diff)<0.05?'gleich stark':(diff>0?'+':'−')+String(Math.abs(Math.round(diff*10)/10)).replace('.',',')+' OVR';
+    var why=u.combos&&u.combos.length?'<div class="small mute" style="margin-top:4px">Neu: '+u.combos.map(function(x){return esc(x.slots.map(function(sl){return sl.map(function(r){return r.name;}).join(' & ');}).join(' + '));}).filter(function(v,i,a){return a.indexOf(v)===i;}).join(' · ')+'</div>':'';
     return '<div class="row"><div class="rowhead">'+artHtml(c)+
       '<button class="open" data-card="'+key(c)+'"><span class="nm">'+esc(nice(c.n))+'</span>'+sub(c)+
-      '<div class="small">ersetzt '+esc(u.replaces.n)+' ('+u.replaces.ovr+') · '+esc(u.where)+'</div><div class="pills" style="margin-top:4px"><span class="pill n">+'+u.delta.toFixed(1)+' Punkte</span>'+g.join('')+'</div></button>'+
+      '<span class="small">statt '+esc(nice(u.replaces.n))+' ('+u.replaces.ovr+') · '+esc(u.where)+' · <span style="color:'+(diff<0?'var(--accent2)':'var(--sal)')+'">'+dtxt+'</span></span>'+
+      '<span class="pills" style="margin-top:2px">'+(bonus?'':'<span class="pill n">+'+u.delta.toFixed(1)+' Punkte</span>')+g.join('')+'</span>'+why+'</button>'+
       '<button class="act" data-tg="'+key(c)+'" aria-label="'+esc(nice(c.n))+' zum Kader hinzufügen">'+IC.plus+'</button></div></div>';
-  }).join('')+'</div><p class="small mute" style="margin-top:8px">Punkte = Zugewinn in der Wertung des Optimierers (1 Punkt entspricht 1 OVR bei einem Spieler). Gerechnet wird je Karte der beste einzelne Tausch. Captain-Boni bleiben hier außen vor.</p>';
+  }).join('')+'</div><p class="small mute" style="margin-top:8px">'+(bonus?'Gerechnet wird je Karte der beste einzelne Tausch in deiner aktuellen Aufstellung, mit Trainer- und Captain-Boni.':'Punkte = Zugewinn in der Wertung des Optimierers (1 Punkt entspricht 1 OVR bei einem Spieler). Gerechnet wird je Karte der beste einzelne Tausch. Captain-Boni bleiben hier außen vor.')+'</p>';
 }
 function viewAnalyse(){
-  view.innerHTML=sharedHtml()+'<h2>Upgrade-Finder</h2>'+upHtml()+'<h2>Kartenvergleich</h2>'+cmpHtml();
+  view.innerHTML=sharedHtml()+'<h2>Vorschläge für neue Karten</h2>'+upHtml()+'<h2>Kartenvergleich</h2>'+cmpHtml();
 }
 
 /* ---------- Setup ---------- */
@@ -1135,7 +1147,12 @@ document.addEventListener('click',function(e){
     case 'sv-back': UI.saved=-1; viewReihen(); break;
     case 'rv-ov': UI.rv='ov'; viewReihen(); break;
     case 'rv-det': UI.rv='det'; viewReihen(); break;
-    case 'up-run': UI.up='run'; viewAnalyse(); setTimeout(function(){var o=opts(); o.minOvr=+UI.upMin||0; UI.up=HUT.upgrades(D,result(),o,25); if(tab()==='analyse') viewAnalyse();},30); break;
+    case 'up-run': UI.up='run'; viewAnalyse(); setTimeout(function(){var o=opts();
+      if(UI.upMode!=='ovr'){ o.maxOvr=+UI.upMax||0; o.tol=+UI.upTol; UI.up=HUT.bonusUpgrades(D,result(),o,30); }
+      else { o.minOvr=+UI.upMin||0; UI.up=HUT.upgrades(D,result(),o,25); }
+      if(tab()==='analyse') viewAnalyse();},30); break;
+    case 'up-m-bonus': UI.upMode='bonus'; UI.up=null; viewAnalyse(); break;
+    case 'up-m-ovr': UI.upMode='ovr'; UI.up=null; viewAnalyse(); break;
   }
 });
 view.addEventListener('input',function(e){
@@ -1154,6 +1171,8 @@ view.addEventListener('change',function(e){
   else if(t.id==='f-hgt'){UI.hgt=t.value; UI.limit=40; results();}
   else if(t.id==='f-hand'){UI.hand=t.value; UI.limit=40; results();}
   else if(t.id==='up-min'){UI.upMin=t.value; UI.up=null;}
+  else if(t.id==='up-max'){UI.upMax=t.value; UI.up=null;}
+  else if(t.id==='up-tol'){UI.upTol=t.value; UI.up=null;}
   else if(t.id==='s-coach'){S.coach=t.value; UI.up=null; save();}
   else if(t.id==='s-captain'){S.captain=t.value; save();}
   else if(t.id==='s-prio'){S.prio=t.value; UI.up=null; save();}

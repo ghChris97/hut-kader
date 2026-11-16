@@ -72,4 +72,11 @@ const pair=rh.defense.find(H.mixedPair);
 if(pair){ const s1=H.sidesD(pair.players,'off'); ok(s1[0].hand==='R'&&s1[1].hand==='L','off-hand: right shooter left, left shooter right');
   const s2=H.sidesD(pair.players,'on'); ok(s2[0].hand==='L'&&s2[1].hand==='R','on-hand: left shooter left'); }
 const same=dOwned.filter(c=>c.hand==='L').slice(0,2); if(same.length===2){ const s3=H.sidesD(same,'off'); ok(s3.length===2&&s3[0]&&s3[1],'same-hand pair still placed'); }
+// Bonus-Finder
+t=Date.now(); const bu=H.bonusUpgrades(data,r,{tol:3},30); const bms=Date.now()-t;
+ok(bu.length>0&&bu.every(u=>u.bonus>0&&u.diff>=-3-1e-9&&!owned.includes(u.card)),'bonus finder: '+bu.length+' cards, all add bonus and are at most 3 weaker ('+bms+' ms)');
+const u0=bu[0], line=(u0.where.includes('Reihe')?r.forwards:r.defense)[parseInt(u0.where)-1];
+const np=line.players.map(p=>p===u0.replaces?u0.card:p); const nl=H.evalLine(np,H.combosFor(data,u0.where.includes('Reihe')?'forwards':'defense'),null);
+ok(nl.boosts.overall+nl.boosts.ability_points+nl.boosts.salary>line.boosts.overall+line.boosts.ability_points+line.boosts.salary,'top suggestion really adds bonuses: '+u0.card.n+' '+u0.card.ovr+' for '+u0.replaces.n+' '+u0.replaces.ovr);
+const capped=H.bonusUpgrades(data,r,{tol:3,maxOvr:82},30); ok(capped.every(u=>u.card.ovr<=82),'max OVR respected ('+capped.length+')');
 process.exit(fail?1:0);

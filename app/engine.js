@@ -377,6 +377,66 @@
     return out.slice(0, limit || 30);
   }
 
+  /* Bonus-Finder: Karten, die durch einen Tausch neue Combos oder den Captain-Bonus freischalten,
+     und dabei hoechstens opts.tol Punkte schwaecher sind als der ersetzte Spieler.
+     Sortiert nach gewonnenen Boni, dann nach niedrigerer OVR (meist leichter zu bekommen). */
+  function bonusUpgrades(data, res, opts, limit) {
+    var ctx = res.ctx, w = ctx.w, val = ctx.val, capBase = res.capBase || 0;
+    var tol = opts.tol != null ? opts.tol : 3, maxOvr = opts.maxOvr || 0;
+    var have = {}, inLineup = {};
+    ctx.owned.forEach(function (c) { have[key(c)] = 1; });
+    lineupPlayers(res).forEach(function (p) { inLineup[p.n] = 1; });
+    var groups = [{ key: 'forwards', lines: res.forwards, combos: combosFor(data, 'forwards', opts.coach), pos: F_POS, label: '. Reihe' },
+      { key: 'defense', lines: res.defense, combos: combosFor(data, 'defense', opts.coach), pos: D_POS, label: '. Paar' }];
+    var room = capBase > 0 ? capBase - (res.totals.sal - res.totals.salBoost) : Infinity;
+    var cst = res.totals.captain, capTeams = cst ? captainTeams(cst.cap, data) : null;
+    var out = [];
+    data.cards.forEach(function (c) {
+      if (c.k !== 's' || have[key(c)] || (maxOvr && c.ovr > maxOvr) || inLineup[c.n]) return;
+      var best = null;
+      groups.forEach(function (g) {
+        if (g.pos.indexOf(c.pos) < 0) return;
+        g.lines.forEach(function (l, li) {
+          for (var si = 0; si < l.players.length; si++) {
+            var o = l.players[si];
+            if (strictFor(ctx, g.key) && o.pos !== c.pos) continue;
+            if (ctx.locks[key(o)]) continue;
+            if (val(c) < val(o) - tol) continue;
+            var np = l.players.slice(); np[si] = c;
+            var nl = evalLine(np, g.combos, val);
+            if ((nl.sal - nl.boosts.salary) - (l.sal - l.boosts.salary) > room + 1e-9) continue;
+            var gain = { overall: nl.boosts.overall - l.boosts.overall, ability_points: nl.boosts.ability_points - l.boosts.ability_points, salary: nl.boosts.salary - l.boosts.salary };
+            var bonus = w.ovr * gain.overall * np.length + w.ap * gain.ability_points + w.sal * gain.salary;
+            // Captain: fehlt genau dieser Spieler aus den Zielteams?
+            var capGain = 0;
+            if (cst && !cst.active && cst.inLineup && capTeams[c.tm] && !capTeams[o.tm] && cst.count + 1 >= cst.need && !(o.k === cst.cap.k && o.id === cst.cap.id)) {
+              capGain = cst.boost; bonus += (cst.type === 'ability_points' ? w.ap : cst.type === 'salary' ? w.sal : w.ovr) * cst.boost;
+            }
+            if (cst && cst.active && capTeams[o.tm] && !capTeams[c.tm] && cst.count - 1 < cst.need) {
+              bonus -= (cst.type === 'ability_points' ? w.ap : cst.type === 'salary' ? w.sal : w.ovr) * cst.boost;
+            }
+            if (bonus <= 1e-9) continue;
+            var newCombos = nl.active.filter(function (x) { return l.active.indexOf(x) < 0 && !l.active.some(function (y) { return y.key === x.key; }); });
+            var cand = { card: c, replaces: o, where: (li + 1) + g.label, gain: gain, capGain: capGain, bonus: bonus, diff: val(c) - val(o), combos: newCombos };
+            if (!best || cand.bonus > best.bonus + 1e-9 || (Math.abs(cand.bonus - best.bonus) < 1e-9 && cand.diff > best.diff)) best = cand;
+          }
+        });
+      });
+      if (best) out.push(best);
+    });
+    // mehr Boni zuerst; bei gleichem Bonus die niedrigere OVR (meist guenstiger), je Spieler nur eine Version
+    out.sort(function (a, b) { return (Math.round(b.bonus * 100) - Math.round(a.bonus * 100)) || a.card.ovr - b.card.ovr || b.diff - a.diff; });
+    var seen = {}, uniq = [];
+    // hoechstens 4 Vorschlaege fuer denselben Platz, damit auch andere Reihen vorkommen
+    var perSlot = {};
+    out.forEach(function (u) {
+      var sk = u.where + '|' + key(u.replaces);
+      if (seen[u.card.n] || (perSlot[sk] || 0) >= 4) return;
+      seen[u.card.n] = 1; perSlot[sk] = (perSlot[sk] || 0) + 1; uniq.push(u);
+    });
+    return uniq.slice(0, limit || 30);
+  }
+
   /* Fast-Combos: Reihen, denen genau eine Anforderung fehlt. */
   function nearMisses(data, res, opts, limit) {
     var ctx = res.ctx, w = ctx.w, out = [], seen = {};
@@ -495,5 +555,5 @@
   root.HUT = { optimize: optimize, comboMatches: comboMatches, evalLine: evalLine, combosFor: combosFor, upgrades: upgrades,
     nearMisses: nearMisses, fillers: fillers, specialTeams: specialTeams, rating: rating, evaluate: evaluate,
     lineupPlayers: lineupPlayers, key: key, GROUPS: GROUPS, sidesD: sidesD, mixedPair: mixedPair,
-    captainTeams: captainTeams, DIVISIONS: DIVISIONS };
+    captainTeams: captainTeams, DIVISIONS: DIVISIONS, bonusUpgrades: bonusUpgrades };
 })(typeof window !== 'undefined' ? window : globalThis);
