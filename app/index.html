@@ -177,6 +177,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--line2);outline:none}
 .k img{width:14px;height:14px;object-fit:contain;vertical-align:-2px;margin-right:3px}
 .nmx{padding:10px 0;border-top:1px solid var(--line)} .nmx:first-of-type{border-top:0}
 .nmh{display:flex;justify-content:space-between;align-items:center}
+.nmslides{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:10px;margin-top:6px;scrollbar-width:none;overscroll-behavior-x:contain}
+.nmslides::-webkit-scrollbar{display:none}
+.nms{flex:0 0 100%;scroll-snap-align:start;min-width:0}
+.nmslides .nms+.nms{border-left:1px solid var(--line);padding-left:10px}
+.nmx .mini .mc{width:40px}
 .nmrow{display:flex;gap:8px;align-items:center;margin-top:8px}
 .nmout{display:flex;flex-direction:column;align-items:center;font-size:11px;color:#ff6b62}
 .nmout .mini{margin:0}
@@ -1017,16 +1022,22 @@ function stHtml(r){
   return h+'<p class="small mute" style="margin-top:8px">Powerplay nach Schuss- und Handwerten, Unterzahl nach Defensivwerten, Speed und Ausdauer. Nur aus den aufgestellten Spielern.</p>';
 }
 function nmHtml(r){
-  var ms=HUT.nearMisses(D,r,opts(),8);
+  var ms=HUT.nearMisses(D,r,opts(),30);
   if(!ms.length) return '<p class="small mute">Gerade fehlt keiner Reihe genau eine Karte für einen weiteren Bonus.</p>';
-  return '<p class="small mute" style="margin-top:0">Diesen Reihen fehlt genau <b>eine</b> passende Karte für einen weiteren Bonus. Links der Spieler, der raus müsste, rechts Karten, die passen würden.</p>'+ms.map(function(m){
-    var fl=HUT.fillers(D,m,r,4);
-    return '<div class="nmx"><div class="nmh"><strong>'+m.where+'</strong><span class="pill '+(m.combo.type==='overall'?'o':m.combo.type==='ability_points'?'a':'s')+'">'+boostLabel(m.combo)+'</span></div>'+
-      '<div class="combo">'+comboHtml(m.combo)+'</div>'+
-      '<div class="nmrow"><div class="nmout">'+mini([m.replace])+'<span>raus</span></div><div class="nmarr">→</div><div class="nmin"><div class="small">Gesucht: '+reqSlot(m.slot)+'</div>'+
-      (fl.length?'<div class="mini">'+fl.map(function(f){return '<button class="mc'+(f.owned?' own':'')+'" data-card="'+key(f.card)+'" aria-label="'+esc(nice(f.card.n))+' '+f.card.ovr+'">'+img(f.card)+'<i>'+f.card.ovr+'</i></button>';}).join('')+'</div>':'<div class="small mute">Keine passende Karte gefunden.</div>')+
-      '</div></div></div>';
-  }).join('')+'<p class="small mute">Grüner Rahmen = Karte hast du schon. Der Optimierer hat sie nicht gesetzt, weil die Reihe damit insgesamt schwächer wäre.</p>';
+  var by={}, order=[];
+  ms.forEach(function(m){ m.fl=HUT.fillers(D,m,r,4); if(!m.fl.length) return; if(!by[m.where]){by[m.where]=[]; order.push(m.where);} by[m.where].push(m); });
+  if(!order.length) return '<p class="small mute">Gerade fehlt keiner Reihe genau eine Karte für einen weiteren Bonus.</p>';
+  return '<p class="small mute" style="margin-top:0">Pro Reihe ein Vorschlag, weitere zum Wischen. Links wer raus müsste, rechts passende Karten (grüner Rahmen = hast du schon).</p>'+order.map(function(w){
+    var list=by[w];
+    return '<div class="nmx"><div class="nmh"><strong>'+esc(w)+'</strong>'+(list.length>1?'<span class="small mute">'+list.length+' Möglichkeiten ›</span>':'')+'</div><div class="nmslides">'+list.map(function(m,ix){
+      var fl=m.fl;
+      return '<div class="nms"><div class="nmh"><span class="pill '+(m.combo.type==='overall'?'o':m.combo.type==='ability_points'?'a':'s')+'">'+boostLabel(m.combo)+'</span>'+(list.length>1?'<span class="small mute">'+(ix+1)+' / '+list.length+'</span>':'')+'</div>'+
+        '<div class="combo">'+comboHtml(m.combo)+'</div>'+
+        '<div class="nmrow"><div class="nmout">'+mini([m.replace])+'<span>raus</span></div><div class="nmarr">→</div><div class="nmin"><div class="small">Gesucht: '+reqSlot(m.slot)+'</div>'+
+        (fl.length?'<div class="mini">'+fl.map(function(f){return '<button class="mc'+(f.owned?' own':'')+'" data-card="'+key(f.card)+'" aria-label="'+esc(nice(f.card.n))+' '+f.card.ovr+'">'+img(f.card)+'<i>'+f.card.ovr+'</i></button>';}).join('')+'</div>':'<div class="small mute">Keine passende Karte gefunden.</div>')+
+        '</div></div></div>';
+    }).join('')+'</div></div>';
+  }).join('');
 }
 function captainHtml(t){
   var c=t.captain; if(!c) return '';
