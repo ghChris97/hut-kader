@@ -129,6 +129,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--line2);outline:none}
 .players{display:grid;gap:8px;grid-template-columns:repeat(3,1fr)}
 .players.n5{grid-template-columns:repeat(5,1fr)} .players.n4{grid-template-columns:repeat(4,1fr)}
 .pl{min-width:0;cursor:pointer;background:none;border:0;padding:0;text-align:left;color:inherit}
+/* Knoepfe zentrieren ihren Inhalt sonst senkrecht: bei unterschiedlich langen Namen verrutschen die Bilder */
+.pl,.slot,.ver{display:flex;flex-direction:column;justify-content:flex-start;align-self:start;align-items:stretch}
 .pl .img{position:relative;aspect-ratio:804/1128;border-radius:8px;overflow:hidden;background:var(--surface2);margin-bottom:6px;display:grid;place-items:center}
 .pl .img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .pl .img .ovr{font-size:28px}
@@ -224,6 +226,31 @@ a{color:var(--blue)}
 .ver .img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .ver small{display:block;font-size:12px;color:var(--mute)}
 body.sheet-open{overflow:hidden}
+
+/* Aufstellung auf einen Blick, aufgebaut wie der Bildschirm im Spiel */
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:3px;margin-bottom:14px}
+.seg button{background:none;border:0;border-radius:9px;padding:8px 6px;font:600 13.5px/1.2 var(--body);color:var(--mute)}
+.seg button[aria-pressed="true"]{background:var(--raise);color:var(--ice);box-shadow:0 1px 0 rgba(255,255,255,.05) inset}
+.rink{display:grid;grid-template-columns:3fr 2fr;gap:14px 10px;background:linear-gradient(180deg,#0f1a2b,#0c1523);border:1px solid var(--line);border-radius:16px;padding:12px 8px 12px 4px;margin-bottom:6px;position:relative;overflow:hidden}
+.rink:before{content:"";position:absolute;top:8%;bottom:8%;left:60%;width:2px;background:rgba(255,79,69,.18)}
+.blk{display:grid;grid-template-columns:14px 1fr;gap:4px;position:relative}
+.blk .side{writing-mode:vertical-rl;transform:rotate(180deg);font:700 10px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--faint);text-align:center;white-space:nowrap}
+.slots{display:grid;gap:5px}
+.slots.c3{grid-template-columns:repeat(3,1fr)} .slots.c2{grid-template-columns:repeat(2,1fr)}
+.slot{min-width:0;background:none;border:0;padding:0;color:inherit;text-align:center}
+.slot .pos{font:700 9.5px/1 var(--display);letter-spacing:.1em;color:var(--faint);margin-bottom:3px;display:block}
+.slot .img{position:relative;aspect-ratio:804/1128;border-radius:5px;overflow:hidden;background:var(--surface2);display:grid;place-items:center;box-shadow:0 6px 14px -8px rgba(0,0,0,.9)}
+.slot .img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.slot .img .ovr{font-size:20px}
+.slot .plus{position:absolute;top:2px;right:2px;background:var(--ovr);color:var(--bg);font:700 9.5px/1 var(--body);padding:2px 3px;border-radius:3px}
+.slot .fixed{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--ovr);box-shadow:0 0 0 2px var(--bg)}
+.slot .nm2{display:block;font:600 10px/1.15 var(--body);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot.empty .img{border:1px dashed var(--line2);background:transparent;box-shadow:none}
+.bon{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px;min-height:18px}
+.bon span{font:700 10.5px/1.5 var(--body);padding:0 5px;border-radius:4px;background:rgba(255,255,255,.05)}
+.bon .o{color:var(--ovr)} .bon .a{color:var(--ap)} .bon .s{color:var(--sal)}
+.legend{font-size:11.5px;color:var(--faint);margin:6px 0 0}
+@media (min-width:560px){.slot .nm2{font-size:11.5px}.slot .img .ovr{font-size:26px}.rink{padding:16px 12px 16px 6px;gap:18px 16px}}
 
 @media (min-width:720px){main{padding:18px max(16px,calc(50% - 360px)) 32px}header{padding-inline:max(16px,calc(50% - 360px))}}
 @media (hover:hover){.row:hover{border-color:var(--line2)}}
@@ -536,6 +563,40 @@ function lineHtml(title,l){
     l.active.map(function(c){return '<div class="combo">'+(c.src==='Coach'?'Coach: ':'')+c.slots.map(function(s){return esc(slotText(s));}).join(' + ')+' → '+boostLabel(c)+'</div>';}).join('')+
     '</div>';
 }
+function bonusMini(b){
+  var p=[];
+  if(b.overall) p.push('<span class="o">+'+b.overall+' GES</span>');
+  if(b.salary) p.push('<span class="s">+'+String(b.salary).replace('.',',')+' M$</span>');
+  if(b.ability_points) p.push('<span class="a">+'+b.ability_points+' FP</span>');
+  return '<div class="bon">'+p.join('')+'</div>';
+}
+function slotHtml(p,pos,boost){
+  if(!p) return '<div class="slot empty"><span class="pos">'+pos+'</span><div class="img"></div><span class="nm2">&nbsp;</span></div>';
+  var last=nice(p.n).split(' '); last=last.length>1?last.slice(1).join(' '):last[0];
+  return '<button class="slot" data-card="'+key(p)+'" aria-label="'+esc(nice(p.n))+', '+(p.ovr+(boost||0))+'"><span class="pos">'+pos+'</span><div class="img"><div class="ovr">'+p.ovr+'</div>'+img(p)+
+    (boost?'<span class="plus">+'+boost+'</span>':'')+(!SHARED&&V.locks[key(p)]?'<span class="fixed" title="fixiert"></span>':'')+'</div><span class="nm2">'+esc(last)+'</span></button>';
+}
+/* Spieler den Plaetzen zuordnen: jeder moeglichst auf seine eigene Position, Rest auffuellen */
+function arrange(players,order){
+  var out=new Array(order.length), rest=[];
+  players.forEach(function(p){ var i=order.indexOf(p.pos); if(i>=0&&!out[i]) out[i]=p; else rest.push(p); });
+  for(var i=0;i<out.length;i++) if(!out[i]) out[i]=rest.shift();
+  return out;
+}
+function overviewHtml(r){
+  var FP=['LA','C','RA'], DP=['LV','RV'], h='<div class="rink">';
+  for(var i=0;i<4;i++){
+    var f=r.forwards[i];
+    h+='<div class="blk"><div class="side">Angriff '+(i+1)+'</div><div><div class="slots c3">'+(function(ps){return FP.map(function(pos,j){return slotHtml(ps[j],pos,f&&f.boosts.overall);});})(f?arrange(f.players,['LW','C','RW']):[]).join('')+'</div>'+(f?bonusMini(f.boosts):'<div class="bon"></div>')+'</div></div>';
+    if(i<3){
+      var d=r.defense[i];
+      h+='<div class="blk"><div class="side">Verteidigung '+(i+1)+'</div><div><div class="slots c2">'+(function(ps){return DP.map(function(pos,j){return slotHtml(ps[j],pos,d&&d.boosts.overall);});})(d?arrange(d.players,['LD','RD']):[]).join('')+'</div>'+(d?bonusMini(d.boosts):'<div class="bon"></div>')+'</div></div>';
+    }else{
+      h+='<div class="blk"><div class="side">Goalies</div><div><div class="slots c2">'+slotHtml(r.goalies[0],'STARTER')+slotHtml(r.goalies[1],'ERSATZ')+'</div><div class="bon"></div></div></div>';
+    }
+  }
+  return h+'</div><p class="legend">GES = Gesamtwertung (OVR), FP = Fähigkeitspunkte, M$ = Cap-Bonus · Karte antippen für Details</p>';
+}
 function apBudget(t){return (parseFloat(S.ap)||0)+t.ap;}
 function apHtml(r){
   var ps=HUT.lineupPlayers(r).filter(function(p){return p.xf&&p.xf.length;}), v=valFn();
@@ -600,9 +661,13 @@ function viewReihen(){
   h+=captainHtml(t);
   var miss=[]; if(r.missing.f) miss.push(r.missing.f+' Sturmreihe'+(r.missing.f>1?'n':'')); if(r.missing.d) miss.push(r.missing.d+' Abwehrpaar'+(r.missing.d>1?'e':'')); if(r.missing.g) miss.push(r.missing.g+' Goalie'+(r.missing.g>1?'s':''));
   if(miss.length) h+='<p class="note warn">Für eine komplette Aufstellung fehlen noch: '+miss.join(', ')+'.'+(S.strict?' Feste Positionen sind an (Setup).':'')+'</p>';
+  h+='<div class="seg" role="group" aria-label="Ansicht"><button id="rv-ov" aria-pressed="'+(UI.rv!=='det')+'">Übersicht</button><button id="rv-det" aria-pressed="'+(UI.rv==='det')+'">Reihen im Detail</button></div>';
+  if(UI.rv!=='det'){ h+=overviewHtml(r); }
+  else{
   if(r.forwards.length){h+='<h2>Sturm</h2><div class="list">'+r.forwards.map(function(l,i){return lineHtml((i+1)+'. Reihe',l);}).join('')+'</div>';}
   if(r.defense.length){h+='<h2>Abwehr</h2><div class="list">'+r.defense.map(function(l,i){return lineHtml((i+1)+'. Paar',l);}).join('')+'</div>';}
   if(r.goalies.length){h+='<h2>Tor</h2><div class="line"><div class="players">'+r.goalies.map(function(p,i){return plHtml(p,i?'Backup':'Starter');}).join('')+'</div></div>';}
+  }
   var inLine={}; HUT.lineupPlayers(r).forEach(function(p){inLine[key(p)]=1;});
   var bench=o.filter(function(c){return !inLine[key(c)];}).sort(function(a,b){return b.ovr-a.ovr;});
   if(bench.length) h+='<h2>Nicht aufgestellt ('+bench.length+')</h2><p class="small mute">'+bench.map(function(c){return esc(nice(c.n))+' '+c.ovr+' '+esc(c.pos)+(!SHARED&&V.bans[key(c)]?' (gesperrt)':'');}).join(' · ')+'</p>';
@@ -935,6 +1000,8 @@ document.addEventListener('click',function(e){
       if(V.lineups.length>12) V.lineups.shift();
       save(); viewReihen(); toast('Aufstellung gemerkt'); break;
     case 'sv-back': UI.saved=-1; viewReihen(); break;
+    case 'rv-ov': UI.rv='ov'; viewReihen(); break;
+    case 'rv-det': UI.rv='det'; viewReihen(); break;
     case 'up-run': UI.up='run'; viewAnalyse(); setTimeout(function(){var o=opts(); o.minOvr=+UI.upMin||0; UI.up=HUT.upgrades(D,result(),o,25); if(tab()==='analyse') viewAnalyse();},30); break;
   }
 });
