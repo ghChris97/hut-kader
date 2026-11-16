@@ -4,6 +4,15 @@
 
   var F_POS = ['LW', 'C', 'RW'];
   var D_POS = ['LD', 'RD'];
+  var LOCK = 1000; // Bonus fuer fixierte Spieler: sie werden praktisch immer aufgestellt
+  var DIVISIONS = {
+    PACIFIC: [1, 5, 12, 14, 24, 314, 28, 29], CENTRAL: [7, 8, 10, 15, 17, 25, 31, 369],
+    METRO: [6, 9, 18, 19, 20, 22, 23, 30], ATLANTIC: [3, 4, 11, 13, 16, 21, 26, 27]
+  };
+  /* Attribut-Gruppen in der Reihenfolge der Feldspieler-Werte */
+  var GROUPS = { skating: [0, 1, 2, 3, 4], shooting: [5, 6, 7, 8], hands: [9, 10, 11, 12, 13], checking: [14, 15, 16, 17, 18], defense: [19, 20, 21, 22, 23] };
+
+  function key(c) { return c.k + c.id; }
 
   function reqOk(p, r) {
     if (r.kind === 'card') return r.ids.indexOf(p.ct) >= 0;
@@ -49,17 +58,17 @@
     });
   }
 
-  function evalLine(players, combos) {
+  function evalLine(players, combos, val) {
     var b = { overall: 0, ability_points: 0, salary: 0 }, active = [];
     for (var i = 0; i < combos.length; i++) {
       if (comboMatches(combos[i], players)) { b[combos[i].type] += combos[i].boost; active.push(combos[i]); }
     }
-    var ovr = 0, sal = 0;
-    players.forEach(function (p) { ovr += p.ovr; sal += p.sal || 0; });
-    return { players: players, boosts: b, active: active, ovr: ovr, sal: sal };
+    var ovr = 0, sal = 0, v = 0;
+    players.forEach(function (p) { ovr += p.ovr; sal += p.sal || 0; v += val ? val(p) : p.ovr; });
+    return { players: players, boosts: b, active: active, ovr: ovr, val: v, sal: sal };
   }
 
-  function candidates(pool, slots, strict, combos) {
+  function candidates(pool, slots, strict, combos, val) {
     var out = [];
     var n = slots.length;
     function rec(start, picked) {
@@ -71,7 +80,7 @@
           ordered = slots.map(function (pos) { return picked.filter(function (p) { return p.pos === pos; })[0]; });
           if (ordered.some(function (p) { return !p; })) return;
         }
-        out.push(evalLine(ordered, combos));
+        out.push(evalLine(ordered, combos, val));
         return;
       }
       for (var j = start; j < pool.length; j++) rec(j + 1, picked.concat([pool[j]]));
@@ -80,19 +89,27 @@
     return out;
   }
 
-  function lineScore(l, w, lambda) {
-    return w.ovr * (l.ovr + l.boosts.overall * l.players.length) +
-      w.ap * l.boosts.ability_points + w.sal * l.boosts.salary -
-      lambda * (l.sal - l.boosts.salary);
+  /* Zusatzpunkte je Spieler: fixiert, oder passend zum Captain-Ziel */
+  function extra(ctx, p) {
+    var e = 0;
+    if (ctx.locks[key(p)]) e += LOCK;
+    if (ctx.teamBonus && ctx.capTeams && ctx.capTeams[p.tm]) e += ctx.teamBonus;
+    return e;
+  }
+  function lineScore(l, ctx, lambda) {
+    var w = ctx.w, s = w.ovr * (l.val + l.boosts.overall * l.players.length) +
+      w.ap * l.boosts.ability_points + w.sal * l.boosts.salary - lambda * (l.sal - l.boosts.salary);
+    for (var i = 0; i < l.players.length; i++) s += extra(ctx, l.players[i]);
+    return s;
   }
 
   /* k disjunkte Reihen mit maximaler Punktesumme (Branch and Bound ueber die besten Kandidaten). */
-  function pickDisjoint(cands, k, w, lambda, banned) {
-    var arr = cands.map(function (l) { return { l: l, s: lineScore(l, w, lambda) }; })
+  function pickDisjoint(cands, k, ctx, lambda, banned) {
+    var arr = cands.map(function (l) { return { l: l, s: lineScore(l, ctx, lambda) }; })
       .filter(function (x) { return !x.l.players.some(function (p) { return banned[p.n]; }); })
       .sort(function (a, b) { return b.s - a.s; });
     if (arr.length > 1500) arr = arr.slice(0, 1500);
-    var best = null, bestScore = -Infinity, nodes = 0, LIMIT = 400000;
+    var best = null, bestScore = -Infinity, nodes = 0, LIMIT = 300000;
     function rec(idx, chosen, used, score) {
       if (chosen.length === k) { if (score > bestScore) { bestScore = score; best = chosen.slice(); } return; }
       var need = k - chosen.length;
@@ -112,65 +129,85 @@
     rec(0, [], {}, 0);
     return best;
   }
-
-  function pickMost(cands, kMax, w, lambda, banned) {
+  function pickMost(cands, kMax, ctx, lambda, banned) {
     for (var k = kMax; k >= 1; k--) {
-      var r = pickDisjoint(cands, k, w, lambda, banned);
+      var r = pickDisjoint(cands, k, ctx, lambda, banned);
       if (r) return r;
     }
     return [];
   }
 
-  function build(ctx, lambda) {
-    var w = ctx.w;
-    var f = pickMost(ctx.fCands, 4, w, lambda, {});
-    var used = {};
-    f.forEach(function (l) { l.players.forEach(function (p) { used[p.n] = 1; }); });
-    var d = pickMost(ctx.dCands, 3, w, lambda, used);
-    d.forEach(function (l) { l.players.forEach(function (p) { used[p.n] = 1; }); });
-    var g = [], gNames = {};
-    ctx.goalies.slice().sort(function (a, b) {
-      return (w.ovr * b.ovr - lambda * (b.sal || 0)) - (w.ovr * a.ovr - lambda * (a.sal || 0)) || (b.aovr || 0) - (a.aovr || 0);
-    }).forEach(function (p) { if (g.length < 2 && !gNames[p.n]) { g.push(p); gNames[p.n] = 1; } });
-    var byAvg = function (a, b) { return (b.ovr + b.boosts.overall * b.players.length) - (a.ovr + a.boosts.overall * a.players.length); };
-    f.sort(byAvg); d.sort(byAvg);
-    var t = { ovrSum: 0, n: 0, boostOvr: 0, ap: 0, salBoost: 0, sal: 0 };
-    f.concat(d).forEach(function (l) {
-      t.ovrSum += l.ovr + l.boosts.overall * l.players.length; t.n += l.players.length;
-      t.boostOvr += l.boosts.overall; t.ap += l.boosts.ability_points; t.salBoost += l.boosts.salary; t.sal += l.sal;
-    });
-    g.forEach(function (p) { t.ovrSum += p.ovr; t.n += 1; t.sal += p.sal || 0; });
-    t.avg = t.n ? t.ovrSum / t.n : 0;
-    t.raw = w.ovr * t.ovrSum + w.ap * t.ap + w.sal * t.salBoost;
-    return { forwards: f, defense: d, goalies: g, totals: t };
+  function lineupPlayers(res) {
+    var out = [];
+    res.forwards.concat(res.defense).forEach(function (l) { l.players.forEach(function (p) { out.push(p); }); });
+    res.goalies.forEach(function (p) { out.push(p); });
+    return out;
   }
 
-  function totals(res, w) {
-    var t = { ovrSum: 0, n: 0, boostOvr: 0, ap: 0, salBoost: 0, sal: 0 };
-    res.forwards.concat(res.defense).forEach(function (l) {
-      t.ovrSum += l.ovr + l.boosts.overall * l.players.length; t.n += l.players.length;
-      t.boostOvr += l.boosts.overall; t.ap += l.boosts.ability_points; t.salBoost += l.boosts.salary; t.sal += l.sal;
+  function captainTeams(cap, data) {
+    var set = {};
+    (cap.teams || []).forEach(function (t) { set[t] = 1; });
+    (cap.groups || []).forEach(function (g) {
+      if (g.kind === 'division' && DIVISIONS[g.key]) DIVISIONS[g.key].forEach(function (t) { set[t] = 1; });
+      if (g.kind === 'league' && data) data.cards.forEach(function (c) { if (c.lgn === g.key) set[c.tm] = 1; });
     });
-    res.goalies.forEach(function (p) { t.ovrSum += p.ovr; t.n += 1; t.sal += p.sal || 0; });
+    return set;
+  }
+  function captainState(res, cap, teams) {
+    var ps = lineupPlayers(res), count = 0, inLineup = false;
+    ps.forEach(function (p) { if (teams[p.tm]) count++; if (p.k === cap.k && p.id === cap.id) inLineup = true; });
+    return { cap: cap, count: count, need: cap.need, inLineup: inLineup, active: inLineup && count >= cap.need, type: cap.type, boost: cap.boost };
+  }
+
+  function totals(res, ctx) {
+    var w = ctx.w, t = { ovrSum: 0, valSum: 0, n: 0, boostOvr: 0, ap: 0, salBoost: 0, sal: 0, locked: 0 };
+    res.forwards.concat(res.defense).forEach(function (l) {
+      var k = l.players.length;
+      t.ovrSum += l.ovr + l.boosts.overall * k; t.valSum += l.val + l.boosts.overall * k; t.n += k;
+      t.boostOvr += l.boosts.overall; t.ap += l.boosts.ability_points; t.salBoost += l.boosts.salary; t.sal += l.sal;
+      l.players.forEach(function (p) { if (ctx.locks[key(p)]) t.locked++; });
+    });
+    res.goalies.forEach(function (p) {
+      t.ovrSum += p.ovr; t.valSum += ctx.val(p); t.n += 1; t.sal += p.sal || 0; if (ctx.locks[key(p)]) t.locked++;
+    });
+    t.comboAp = t.ap; t.comboSal = t.salBoost;
+    if (ctx.captain) {
+      var st = captainState(res, ctx.captain, ctx.capTeams);
+      t.captain = st;
+      if (st.active) {
+        if (st.type === 'ability_points') t.ap += st.boost;
+        else if (st.type === 'salary') t.salBoost += st.boost;
+      }
+    }
     t.avg = t.n ? t.ovrSum / t.n : 0;
-    t.raw = w.ovr * t.ovrSum + w.ap * t.ap + w.sal * t.salBoost;
+    t.raw = w.ovr * t.valSum + w.ap * t.ap + w.sal * t.salBoost + LOCK * t.locked;
     return t;
+  }
+
+  function build(ctx, lambda) {
+    var f = pickMost(ctx.fCands, 4, ctx, lambda, {});
+    var used = {};
+    f.forEach(function (l) { l.players.forEach(function (p) { used[p.n] = 1; }); });
+    var d = pickMost(ctx.dCands, 3, ctx, lambda, used);
+    d.forEach(function (l) { l.players.forEach(function (p) { used[p.n] = 1; }); });
+    var g = [], gNames = {};
+    var gs = function (p) { return ctx.w.ovr * ctx.val(p) + extra(ctx, p) - lambda * (p.sal || 0); };
+    ctx.goalies.slice().sort(function (a, b) { return gs(b) - gs(a) || (b.aovr || 0) - (a.aovr || 0); })
+      .forEach(function (p) { if (g.length < 2 && !gNames[p.n] && !used[p.n]) { g.push(p); gNames[p.n] = 1; } });
+    var res = { forwards: f, defense: d, goalies: g };
+    res.totals = totals(res, ctx);
+    return res;
   }
 
   /* Nachbessern: einzelne Spieler gegen Bankspieler tauschen, solange der Wert steigt und der Cap haelt. */
   function improve(res, ctx, capBase) {
-    var w = ctx.w;
     var fits = function (t) { return !(capBase > 0) || t.sal - t.salBoost <= capBase + 1e-9; };
-    var groups = [
-      { key: 'forwards', pool: ctx.fPool, combos: ctx.fC },
-      { key: 'defense', pool: ctx.dPool, combos: ctx.dC }
-    ];
-    var cur = totals(res, w), changed = true, rounds = 0;
+    var groups = [{ key: 'forwards', pool: ctx.fPool, combos: ctx.fC }, { key: 'defense', pool: ctx.dPool, combos: ctx.dC }];
+    var cur = totals(res, ctx), changed = true, rounds = 0;
     while (changed && rounds++ < 40) {
       changed = false;
       var used = {};
-      res.forwards.concat(res.defense).forEach(function (l) { l.players.forEach(function (p) { used[p.n] = 1; }); });
-      res.goalies.forEach(function (p) { used[p.n] = 1; });
+      lineupPlayers(res).forEach(function (p) { used[p.n] = 1; });
       for (var gi = 0; gi < groups.length && !changed; gi++) {
         var g = groups[gi], lines = res[g.key];
         for (var li = 0; li < lines.length && !changed; li++) {
@@ -180,10 +217,9 @@
               var b = g.pool[bi];
               if (used[b.n] || (ctx.strict && b.pos !== out.pos)) continue;
               var np = old.players.slice(); np[si] = b;
-              lines[li] = evalLine(np, g.combos);
-              var t = totals(res, w);
-              var better = fits(t) && (t.raw > cur.raw + 1e-9 || (!fits(cur)));
-              if (better) { cur = t; changed = true; break; }
+              lines[li] = evalLine(np, g.combos, ctx.val);
+              var t = totals(res, ctx);
+              if (fits(t) && (t.raw > cur.raw + 1e-9 || !fits(cur))) { cur = t; changed = true; break; }
               lines[li] = old;
             }
           }
@@ -194,54 +230,250 @@
     return res;
   }
 
-  /* owned: Kartenobjekte des Kaders. opts: {coach, strict, cap, w:{ovr,ap,sal}} */
-  function optimize(data, owned, opts) {
-    var strict = opts.strict !== false;
-    var fPool = owned.filter(function (c) { return c.k === 's' && F_POS.indexOf(c.pos) >= 0; });
-    var dPool = owned.filter(function (c) { return c.k === 's' && D_POS.indexOf(c.pos) >= 0; });
-    var goalies = owned.filter(function (c) { return c.k === 'g'; });
-    var cap = function (pool, max) {
-      return pool.slice().sort(function (a, b) { return b.ovr - a.ovr || (b.aovr || 0) - (a.aovr || 0); }).slice(0, max);
-    };
-    // Sehr grosse Kader begrenzen, damit die Rechnung auf dem Handy fluessig bleibt.
-    fPool = cap(fPool, strict ? 60 : 30); dPool = cap(dPool, 40);
-    var fC = usable(combosFor(data, 'forwards', opts.coach), fPool);
-    var dC = usable(combosFor(data, 'defense', opts.coach), dPool);
-    var ctx = {
-      w: opts.w || { ovr: 1, ap: 0.5, sal: 0.25 },
-      strict: strict, fPool: fPool, dPool: dPool, fC: fC, dC: dC,
-      fCands: candidates(fPool, F_POS, strict, fC),
-      dCands: candidates(dPool, D_POS, strict, dC),
-      goalies: goalies
-    };
+  function solve(ctx, capBase) {
     var res = build(ctx, 0);
-    var capBase = opts.cap > 0 ? opts.cap : 0;
     var over = function (r) { return capBase > 0 && r.totals.sal - r.totals.salBoost > capBase + 1e-9; };
-    res.capBase = capBase;
     if (over(res)) {
       var lo = 0, hi = 0.5, bestFeasible = null, tries = 0;
       var r = build(ctx, hi);
       while (over(r) && tries++ < 8) { hi *= 2.5; r = build(ctx, hi); }
       if (!over(r)) bestFeasible = r;
-      for (var i = 0; i < 9 && bestFeasible; i++) {
+      for (var i = 0; i < 8 && bestFeasible; i++) {
         var mid = (lo + hi) / 2;
         r = build(ctx, mid);
         if (over(r)) lo = mid; else { hi = mid; if (r.totals.raw >= bestFeasible.totals.raw) bestFeasible = r; }
       }
-      if (bestFeasible) { res = bestFeasible; res.capBase = capBase; res.capAdjusted = true; }
+      if (bestFeasible) { res = bestFeasible; res.capAdjusted = true; }
       else { res.capFailed = true; }
     }
-    if (!res.capFailed) {
-      improve(res, ctx, capBase);
-      var byAvg2 = function (a, b) { return (b.ovr + b.boosts.overall * b.players.length) - (a.ovr + a.boosts.overall * a.players.length); };
-      res.forwards.sort(byAvg2); res.defense.sort(byAvg2);
-    }
-    res.pools = { f: fPool.length, d: dPool.length, g: goalies.length };
-    res.missing = {
-      f: Math.max(0, 4 - res.forwards.length), d: Math.max(0, 3 - res.defense.length), g: Math.max(0, 2 - res.goalies.length)
-    };
+    if (!res.capFailed) improve(res, ctx, capBase);
     return res;
   }
 
-  root.HUT = { optimize: optimize, comboMatches: comboMatches, evalLine: evalLine, combosFor: combosFor };
+  function makeCtx(data, owned, opts) {
+    var strict = opts.strict !== false, bans = opts.bans || {}, locks = opts.locks || {};
+    var val = opts.val || function (p) { return p.ovr; };
+    owned = owned.filter(function (c) { return !bans[key(c)]; });
+    var fPool = owned.filter(function (c) { return c.k === 's' && F_POS.indexOf(c.pos) >= 0; });
+    var dPool = owned.filter(function (c) { return c.k === 's' && D_POS.indexOf(c.pos) >= 0; });
+    var goalies = owned.filter(function (c) { return c.k === 'g'; });
+    var top = function (pool, max) {
+      return pool.slice().sort(function (a, b) { return (locks[key(b)] ? 1 : 0) - (locks[key(a)] ? 1 : 0) || val(b) - val(a); }).slice(0, max);
+    };
+    // Sehr grosse Kader begrenzen, damit die Rechnung auf dem Handy fluessig bleibt.
+    fPool = top(fPool, strict ? 54 : 28); dPool = top(dPool, 36);
+    var fC = usable(combosFor(data, 'forwards', opts.coach), fPool);
+    var dC = usable(combosFor(data, 'defense', opts.coach), dPool);
+    return {
+      w: opts.w || { ovr: 1, ap: 0.5, sal: 0.25 }, val: val, locks: locks, strict: strict,
+      fPool: fPool, dPool: dPool, fC: fC, dC: dC, goalies: goalies,
+      fCands: candidates(fPool, F_POS, strict, fC, val), dCands: candidates(dPool, D_POS, strict, dC, val),
+      captain: null, capTeams: null, teamBonus: 0, owned: owned
+    };
+  }
+
+  /* owned: Kartenobjekte des Kaders.
+     opts: {coach, strict, cap, w:{ovr,ap,sal}, val(card), locks:{key:1}, bans:{key:1}, captain:'auto'|''|key} */
+  function optimize(data, owned, opts) {
+    opts = opts || {};
+    var ctx = makeCtx(data, owned, opts);
+    var capBase = opts.cap > 0 ? opts.cap : 0;
+    var best = solve(ctx, capBase);
+    var capOpt = opts.captain === undefined ? 'auto' : opts.captain;
+    if (capOpt && data.captains && data.captains.length) {
+      var ownedKeys = {};
+      ctx.owned.forEach(function (c) { ownedKeys[key(c)] = c; });
+      var cands = data.captains.filter(function (c) {
+        return ownedKeys[c.k + c.id] && (capOpt === 'auto' || capOpt === c.k + c.id);
+      });
+      var baseLocks = ctx.locks;
+      cands.forEach(function (cap) {
+        ctx.captain = cap; ctx.capTeams = captainTeams(cap, data);
+        ctx.locks = Object.assign({}, baseLocks); ctx.locks[cap.k + cap.id] = 1;
+        var steps = [0, 0.5, 1.5, 3, 6, 12], found = null;
+        for (var i = 0; i < steps.length && !found; i++) {
+          ctx.teamBonus = steps[i];
+          var r = solve(ctx, capBase);
+          if (!r.capFailed && r.totals.captain && r.totals.captain.active) found = r;
+        }
+        ctx.teamBonus = 0;
+        if (found) {
+          // Vergleich ohne den Fixier-Bonus des Captains selbst
+          var a = found.totals.raw - LOCK * (baseLocks[cap.k + cap.id] ? 0 : 1);
+          if (!best || best.capFailed || a > best.totals.raw + 1e-9) { best = found; best.totals.rawAdj = a; }
+        } else if (capOpt !== 'auto' && !best.totals.captain) {
+          // gewuenschter Captain erreicht das Ziel nicht: trotzdem den Stand zeigen
+          ctx.teamBonus = 0;
+          best.totals.captain = captainState(best, cap, ctx.capTeams);
+        }
+        ctx.captain = null; ctx.capTeams = null; ctx.locks = baseLocks;
+      });
+    }
+    var byAvg = function (a, b) { return (b.val + b.boosts.overall * b.players.length) - (a.val + a.boosts.overall * a.players.length); };
+    best.forwards.sort(byAvg); best.defense.sort(byAvg);
+    best.capBase = capBase;
+    best.pools = { f: ctx.fPool.length, d: ctx.dPool.length, g: ctx.goalies.length };
+    best.missing = { f: Math.max(0, 4 - best.forwards.length), d: Math.max(0, 3 - best.defense.length), g: Math.max(0, 2 - best.goalies.length) };
+    best.ctx = ctx;
+    return best;
+  }
+
+  function contrib(l, w) {
+    return w.ovr * (l.val + l.boosts.overall * l.players.length) + w.ap * l.boosts.ability_points + w.sal * l.boosts.salary;
+  }
+
+  /* Upgrade-Finder: fuer jede fremde Karte der beste Einzeltausch in die aktuelle Aufstellung. */
+  function upgrades(data, res, opts, limit) {
+    var ctx = res.ctx, w = ctx.w, val = ctx.val, capBase = res.capBase || 0;
+    var have = {}, inLineup = {};
+    ctx.owned.forEach(function (c) { have[key(c)] = 1; });
+    lineupPlayers(res).forEach(function (p) { inLineup[p.n] = (inLineup[p.n] || 0) + 1; });
+    var fAll = combosFor(data, 'forwards', opts.coach), dAll = combosFor(data, 'defense', opts.coach);
+    var groups = [{ lines: res.forwards, combos: fAll, pos: F_POS, label: '. Reihe' }, { lines: res.defense, combos: dAll, pos: D_POS, label: '. Paar' }];
+    var room = capBase > 0 ? capBase - (res.totals.sal - res.totals.salBoost) : Infinity;
+    var minOvr = opts.minOvr || 0, out = [];
+    data.cards.forEach(function (c) {
+      if (have[key(c)] || c.ovr < minOvr) return;
+      var best = null;
+      if (c.k === 'g') {
+        res.goalies.forEach(function (g, gi) {
+          if (inLineup[c.n] && g.n !== c.n) return;
+          var d = w.ovr * (val(c) - val(g));
+          if ((c.sal || 0) - (g.sal || 0) > room + 1e-9) return;
+          if (d > 1e-9 && (!best || d > best.delta)) best = { card: c, delta: d, replaces: g, where: gi ? 'Backup' : 'Starter', gain: { overall: 0, ability_points: 0, salary: 0 } };
+        });
+      } else {
+        groups.forEach(function (g) {
+          if (g.pos.indexOf(c.pos) < 0) return;
+          g.lines.forEach(function (l, li) {
+            for (var si = 0; si < l.players.length; si++) {
+              var out0 = l.players[si];
+              if (ctx.strict && out0.pos !== c.pos) continue;
+              if (ctx.locks[key(out0)]) continue;
+              if (inLineup[c.n] && out0.n !== c.n) continue;
+              if (val(c) < val(out0) - 8) continue;
+              var np = l.players.slice(); np[si] = c;
+              var nl = evalLine(np, g.combos, val);
+              var d = contrib(nl, w) - contrib(l, w);
+              if ((nl.sal - nl.boosts.salary) - (l.sal - l.boosts.salary) > room + 1e-9) continue;
+              if (d > 1e-9 && (!best || d > best.delta)) {
+                best = { card: c, delta: d, replaces: out0, where: (li + 1) + g.label,
+                  gain: { overall: nl.boosts.overall - l.boosts.overall, ability_points: nl.boosts.ability_points - l.boosts.ability_points, salary: nl.boosts.salary - l.boosts.salary } };
+              }
+            }
+          });
+        });
+      }
+      if (best) out.push(best);
+    });
+    out.sort(function (a, b) { return b.delta - a.delta || b.card.ovr - a.card.ovr; });
+    return out.slice(0, limit || 30);
+  }
+
+  /* Fast-Combos: Reihen, denen genau eine Anforderung fehlt. */
+  function nearMisses(data, res, opts, limit) {
+    var ctx = res.ctx, w = ctx.w, out = [], seen = {};
+    var groups = [{ lines: res.forwards, combos: combosFor(data, 'forwards', opts.coach), label: '. Reihe' },
+      { lines: res.defense, combos: combosFor(data, 'defense', opts.coach), label: '. Paar' }];
+    groups.forEach(function (g) {
+      g.lines.forEach(function (l, li) {
+        g.combos.forEach(function (c) {
+          if (comboMatches(c, l.players)) return;
+          var n = c.slots.length, perms = PERMS[n];
+          for (var i = 0; i < perms.length; i++) {
+            var missSlot = -1, misses = 0;
+            for (var s = 0; s < n; s++) if (!slotOk(l.players[perms[i][s]], c.slots[s])) { misses++; missSlot = s; }
+            if (misses !== 1) continue;
+            var who = l.players[perms[i][missSlot]];
+            var id = g.label + li + c.key + key(who);
+            if (seen[id]) continue; seen[id] = 1;
+            var worth = c.type === 'overall' ? w.ovr * c.boost * n : c.type === 'ability_points' ? w.ap * c.boost : w.sal * c.boost;
+            out.push({ where: (li + 1) + g.label, combo: c, slot: c.slots[missSlot], replace: who, worth: worth, line: l });
+          }
+        });
+      });
+    });
+    out.sort(function (a, b) { return b.worth - a.worth; });
+    // je Reihe und Combo nur den Vorschlag mit dem schwaechsten zu ersetzenden Spieler
+    var per = {}, res2 = [];
+    out.forEach(function (m) {
+      var k = m.where + m.combo.key;
+      if (!per[k] || ctx.val(m.replace) < ctx.val(per[k].replace)) per[k] = m;
+    });
+    Object.keys(per).forEach(function (k) { res2.push(per[k]); });
+    res2.sort(function (a, b) { return b.worth - a.worth; });
+    return res2.slice(0, limit || 8);
+  }
+
+  /* Karten, die einen fehlenden Slot fuellen wuerden (beste zuerst). */
+  function fillers(data, miss, res, n) {
+    var ctx = res.ctx, used = {};
+    lineupPlayers(res).forEach(function (p) { used[p.n] = 1; });
+    var ownedKeys = {};
+    ctx.owned.forEach(function (c) { ownedKeys[key(c)] = 1; });
+    var group = F_POS.indexOf(miss.replace.pos) >= 0 ? F_POS : D_POS;
+    return data.cards.filter(function (c) {
+      if (c.k !== 's' || !slotOk(c, miss.slot)) return false;
+      if (ctx.strict ? c.pos !== miss.replace.pos : group.indexOf(c.pos) < 0) return false;
+      return !used[c.n] || c.n === miss.replace.n;
+    }).map(function (c) { return { card: c, owned: !!ownedKeys[key(c)] }; })
+      .sort(function (a, b) { return (b.owned ? 1 : 0) - (a.owned ? 1 : 0) || ctx.val(b.card) - ctx.val(a.card); }).slice(0, n || 3);
+  }
+
+  function avg(p, idx) { var s = 0; idx.forEach(function (i) { s += p.a[i] || 0; }); return s / idx.length; }
+
+  /* Powerplay und Unterzahl aus den aufgestellten Feldspielern */
+  function specialTeams(res) {
+    var fw = [], df = [];
+    res.forwards.forEach(function (l) { l.players.forEach(function (p) { fw.push(p); }); });
+    res.defense.forEach(function (l) { l.players.forEach(function (p) { df.push(p); }); });
+    var off = function (p) { return avg(p, [5, 6, 7, 8, 9, 10, 11, 12, 13]); };
+    var offD = function (p) { return avg(p, [6, 5, 10, 12, 13, 4]); };
+    var def = function (p) { return avg(p, [19, 20, 21, 4, 3]); };
+    var by = function (f) { return function (a, b) { return f(b) - f(a); }; };
+    var fo = fw.slice().sort(by(off)), dOff = df.slice().sort(by(offD));
+    var fd = fw.slice().sort(by(def)), dDef = df.slice().sort(by(def));
+    return {
+      pp: [{ f: fo.slice(0, 3), d: dOff.slice(0, 2) }, { f: fo.slice(3, 6), d: dOff.slice(2, 4) }],
+      pk: [{ f: fd.slice(0, 2), d: dDef.slice(0, 2) }, { f: fd.slice(2, 4), d: dDef.slice(2, 4) }]
+    };
+  }
+
+  /* Eigene Bewertung: gewichteter Schnitt der Attribut-Gruppen, sonst OVR. */
+  function rating(weights) {
+    var keys = Object.keys(GROUPS), sum = 0;
+    keys.forEach(function (k) { sum += +weights[k] || 0; });
+    if (!sum) return function (p) { return p.ovr; };
+    return function (p) {
+      if (p.k !== 's') return p.ovr;
+      var v = 0;
+      keys.forEach(function (k) { if (+weights[k]) v += (+weights[k]) * avg(p, GROUPS[k]); });
+      return Math.round(v / sum * 10) / 10;
+    };
+  }
+
+  /* Gespeicherte Aufstellung (Listen von Kartenschluesseln) neu bewerten */
+  function evaluate(data, lines, opts, byKey) {
+    var val = opts.val || function (p) { return p.ovr; };
+    var get = function (arr) { return arr.map(function (k) { return byKey[k]; }).filter(Boolean); };
+    var fC = combosFor(data, 'forwards', opts.coach), dC = combosFor(data, 'defense', opts.coach);
+    var res = {
+      forwards: (lines.f || []).map(get).filter(function (a) { return a.length === 3; }).map(function (a) { return evalLine(a, fC, val); }),
+      defense: (lines.d || []).map(get).filter(function (a) { return a.length === 2; }).map(function (a) { return evalLine(a, dC, val); }),
+      goalies: get(lines.g || [])
+    };
+    var ctx = { w: opts.w || { ovr: 1, ap: 0.5, sal: 0.25 }, val: val, locks: {}, captain: null };
+    if (lines.c) {
+      var cap = (data.captains || []).filter(function (c) { return c.k + c.id === lines.c; })[0];
+      if (cap) { ctx.captain = cap; ctx.capTeams = captainTeams(cap, data); }
+    }
+    res.totals = totals(res, ctx);
+    res.capBase = opts.cap > 0 ? opts.cap : 0;
+    res.missing = { f: 0, d: 0, g: 0 };
+    return res;
+  }
+
+  root.HUT = { optimize: optimize, comboMatches: comboMatches, evalLine: evalLine, combosFor: combosFor, upgrades: upgrades,
+    nearMisses: nearMisses, fillers: fillers, specialTeams: specialTeams, rating: rating, evaluate: evaluate,
+    lineupPlayers: lineupPlayers, key: key, GROUPS: GROUPS };
 })(typeof window !== 'undefined' ? window : globalThis);

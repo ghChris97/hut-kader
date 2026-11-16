@@ -235,6 +235,54 @@ def parse_combos(s):
     return out
 
 
+def parse_xfactors(s, items):
+    """X-Factor-Glossar: Stufe, AP-Kosten und Effekte je X-Factor-ID."""
+    by_logo = {base(i["logo"]): int(i["id"]) for i in items}
+    out = {}
+    s = re.sub(r"\s+", " ", s)
+    for art in s.split('<article class="xfactor-card')[1:]:
+        name = text(re.search(r'class="xfactor-name">(.*?)</div>', art, re.S).group(1))
+        cat = text(re.search(r'class="xfactor-category">(.*?)</div>', art, re.S).group(1))
+        dm = re.search(r'class="xfactor-description">(.*?)</div>', art, re.S)
+        desc = " ".join(text(x) for x in re.findall(r"<p>(.*?)</p>", dm.group(1), re.S)) if dm else ""
+        for tier in art.split('<div class="tier-section')[1:]:
+            logo = re.search(r'<img class="xfactor-logo" src="([^"]+)"', tier)
+            ap = re.search(r'class="ap_amount">\s*(\d+)', tier)
+            typ = re.search(r'class="xfactor_type">(.*?)</div>', tier, re.S)
+            eff = list(zip([text(x) for x in re.findall(r'class="bonus_effect">(.*?)</div>', tier, re.S)],
+                           [text(x) for x in re.findall(r'class="bonus_change">(.*?)</div>', tier, re.S)]))
+            xid = by_logo.get(base(logo.group(1))) if logo else None
+            if xid is None or not ap:
+                continue
+            out[str(xid)] = {"n": name, "t": text(typ.group(1)) if typ else "", "ap": int(ap.group(1)),
+                             "cat": cat, "d": desc, "e": [list(e) for e in eff]}
+    return out
+
+
+def parse_captains(s):
+    """Captain-Karten aus dem Team Builder: ab N Spielern aus den genannten Teams gibt es einen Bonus."""
+    m = re.search(r"captainRequirements\s*:\s*(\{.*?\})\s*,\s*coachBuilderData", s, re.S)
+    if not m:
+        return []
+    out = []
+    for key, c in json.loads(m.group(1)).items():
+        km = re.match(r"(player|goalie)_(\d+)$", key)
+        if not km:
+            continue
+        teams, groups = [], []
+        for t in c.get("teams") or []:
+            if isinstance(t, dict):
+                groups.append({"kind": t.get("captainItemType"), "key": t.get("key")})
+            else:
+                teams.append(int(t))
+        typ = c.get("boostType") or "ability_points"
+        out.append({"k": "s" if km.group(1) == "player" else "g", "id": int(km.group(2)),
+                    "need": int(c.get("requirementAmount") or 0), "type": typ,
+                    "boost": float(c.get("boostAmount") or 0), "teams": teams, "groups": groups,
+                    "title": c.get("title") or ""})
+    return out
+
+
 def parse_coaches(s, name_ids):
     out = []
     s = re.sub(r"\s+", " ", s)
@@ -312,6 +360,17 @@ def main(outdir):
         print(f"  Coaches uebersprungen: {e}", flush=True)
         coaches = []
 
+    def optional(label, fn, default):
+        try:
+            return fn()
+        except Exception as e:  # noqa: BLE001
+            print(f"  {label} uebersprungen: {e}", flush=True)
+            return default
+
+    print("X-Factors und Captains ...", flush=True)
+    xf = optional("X-Factors", lambda: parse_xfactors(http("xfactor-glossary.php", referer="xfactor-glossary.php"), lists["xfactor"]), {})
+    captains = optional("Captains", lambda: parse_captains(http("builder.php", referer="builder.php")), [])
+
     # Plausibilitaet: lieber abbrechen als kaputte Daten veroeffentlichen
     n_s = sum(1 for c in cards if c["k"] == "s")
     n_g = len(cards) - n_s
@@ -330,10 +389,12 @@ def main(outdir):
         "game": f"NHL {version}", "version": version, "newer": newer,
         "source": f"nhlhutbuilder.com (NHL {version})",
         "skaters": n_s, "goalies": n_g, "combos": len(combos), "coaches": len(coaches),
+        "xfactors": len(xf), "captains": len(captains),
         "skater_attrs": SKATER_ATTRS, "goalie_attrs": GOALIE_ATTRS,
         "img_base": BASE,
     }
-    data = {"meta": meta, "lists": lists, "cards": cards, "combos": combos, "coaches": coaches}
+    data = {"meta": meta, "lists": lists, "cards": cards, "combos": combos, "coaches": coaches,
+            "xf": xf, "captains": captains}
     (out / "hut.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     (out / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
     print(json.dumps({k: v for k, v in meta.items() if k not in ("skater_attrs", "goalie_attrs")}))
