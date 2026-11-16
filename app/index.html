@@ -621,10 +621,14 @@ function prepImage(file){ // verkleinern und als JPEG kodieren, damit der Upload
     im.src=url;
   });
 }
+var SCAN_CTRL=null;
 function scanImage(b64){
-  return fetch(SCAN_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:b64,mime:'image/jpeg'})})
+  SCAN_CTRL=window.AbortController?new AbortController():null;
+  var to=setTimeout(function(){ if(SCAN_CTRL) SCAN_CTRL.abort(); },150000);
+  return fetch(SCAN_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:b64,mime:'image/jpeg'}),signal:SCAN_CTRL?SCAN_CTRL.signal:undefined})
+    .finally(function(){clearTimeout(to);})
     .then(function(r){return r.json().catch(function(){return {error:'HTTP '+r.status};}).then(function(j){ if(!r.ok||j.error) throw new Error(j.error||('HTTP '+r.status)); return j.cards||[]; });},
-          function(){throw new Error('Keine Verbindung zum Scan-Dienst. Für das Einlesen brauchst du Internet.');});
+          function(e){ if(e&&e.name==='AbortError') throw new Error(UI.imp&&UI.imp.cancel?'Abgebrochen.':'Gemini hat zu lange gebraucht. Versuch es gleich noch einmal.'); throw new Error('Keine Verbindung zum Scan-Dienst. Für das Einlesen brauchst du Internet.');});
 }
 var POSMAP={LA:'LW',RA:'RW',LV:'LD',RV:'RD',LF:'LW',RF:'RW',D:'',F:'',TW:'G',GK:'G'};
 /* Karten zu einem gelesenen Namen finden: voller Name, sonst Nachname (mit Vornamen-Initiale), sonst ein Tippfehler Abstand */
@@ -680,7 +684,7 @@ function runPaste(text){
 }
 function viewImport(){
   var I=UI.imp, h='<h2>Kader einlesen</h2>';
-  if(I.step==='scan'){view.innerHTML=h+'<p>'+esc(I.msg)+'</p><progress aria-label="Fortschritt"></progress><p class="small mute" style="margin-top:10px">Das Bild geht zum Auslesen an Google Gemini. Das dauert meist 5 bis 15 Sekunden.</p>';return;}
+  if(I.step==='scan'){view.innerHTML=h+'<p>'+esc(I.msg)+'</p><progress aria-label="Fortschritt"></progress><p class="small mute" style="margin-top:10px">Das Bild geht zum Auslesen an Google Gemini. Das dauert meist 10 bis 40 Sekunden, wenn Gemini ausgelastet ist auch länger.</p><p><button class="btn ghost" id="imp-cancel">Abbrechen</button></p>';return;}
   if(I.step==='paste'){view.innerHTML=h+'<p class="small mute">Öffne den Screenshot in Google Lens, tippe auf „Text auswählen" und dann auf „Kopieren". Füge den Text hier ein:</p><textarea id="imp-text" rows="8" style="width:100%;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px;color:var(--ice)" aria-label="Kopierter Text"></textarea><div class="btns" style="margin-top:10px"><button class="btn" id="imp-paste-go">Namen suchen</button><button class="btn ghost" id="imp-x">Abbrechen</button></div>';return;}
   if(I.step==='error'){view.innerHTML=h+'<p class="note warn">'+esc(I.msg)+'</p><div class="btns"><button class="btn ghost" id="imp-paste">Stattdessen Text einfügen</button><button class="btn ghost" id="imp-x">Zurück zum Kader</button></div>';return;}
   var ok=I.found.filter(function(f){return f.cards.length;}), bad=I.found.filter(function(f){return !f.cards.length;});
@@ -753,6 +757,7 @@ view.addEventListener('click',function(e){
     case 'imp-cam': document.getElementById('file-cam').click(); break;
     case 'imp-x': UI.imp=null; viewKader(); break;
     case 'imp-paste': UI.imp={step:'paste'}; viewKader(); break;
+    case 'imp-cancel': if(UI.imp) UI.imp.cancel=true; if(SCAN_CTRL) SCAN_CTRL.abort(); break;
     case 'imp-paste-go': runPaste(document.getElementById('imp-text').value); break;
     case 'imp-ok':
       var n=0; UI.imp.found.forEach(function(f){ if(f.on&&V.owned.indexOf(f.sel)<0){V.owned.push(f.sel); n++;} });

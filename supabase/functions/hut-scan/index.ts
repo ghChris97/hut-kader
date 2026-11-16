@@ -3,10 +3,12 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 // Erstes verfuegbares Modell gewinnt; ein abgeschaltetes Modell wird uebersprungen.
-const MODELS = (Deno.env.get("GEMINI_MODEL") ?? "gemini-3.8-flash,gemini-3.7-flash,gemini-3.5-flash,gemini-3.5-flash-lite")
+const MODELS = (Deno.env.get("GEMINI_MODEL") ?? "gemini-3.5-flash-lite,gemini-3.5-flash,gemini-3.8-flash")
   .split(",").map((m) => m.trim()).filter(Boolean);
 const ALLOWED = ["https://ghchris97.github.io", "http://localhost:8765", "http://127.0.0.1:8765"];
 const MAX_BYTES = 6_000_000;
+const PER_MODEL_MS = 40_000;  // Supabase beendet eine Funktion nach 150 s, deshalb jedes Modell begrenzen
+const TOTAL_MS = 135_000;
 
 const PROMPT = `Das Bild zeigt eine Aufstellung aus "Hockey Ultimate Team" (EA SPORTS NHL), als Screenshot oder als Foto vom Fernseher.
 Lies JEDE sichtbare Spielerkarte aus. Pro Karte:
@@ -62,8 +64,14 @@ Deno.serve(async (req) => {
 
   let res: Response | null = null, out: any = null, model = "";
   const tried: string[] = [];
+  const started = Date.now();
   for (const m of MODELS) {
+    const left = TOTAL_MS - (Date.now() - started);
+    if (left < 8_000) break;
     model = m;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), Math.min(PER_MODEL_MS, left));
+    try {
     res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
@@ -71,8 +79,15 @@ Deno.serve(async (req) => {
         contents: [{ role: "user", parts: [{ inline_data: { mime_type: mime, data: image } }, { text: PROMPT }] }],
         generationConfig: { temperature: 0, responseMimeType: "application/json", responseSchema: SCHEMA },
       }),
+      signal: ctrl.signal,
     });
     out = await res.json().catch(() => null);
+    } catch {
+      clearTimeout(timer);
+      tried.push(`${m}:timeout`); res = null; out = null;
+      continue;
+    }
+    clearTimeout(timer);
     const msg = String(out?.error?.message ?? "");
     tried.push(`${m}:${res.status}`);
     // abgeschaltet, ueberlastet oder Kontingent dieses Modells leer: naechstes Modell probieren
@@ -81,6 +96,8 @@ Deno.serve(async (req) => {
     if (!skip) break;
   }
   if (!res || !res.ok) {
+    console.log(JSON.stringify({ tried, failed: true }));
+    if (!res) return json({ error: "Gemini hat zu lange gebraucht. Versuch es in ein paar Minuten noch einmal." }, 504, h);
     const msg = out?.error?.message ?? `HTTP ${res?.status}`;
     const busy = res?.status === 429;
     return json({ error: busy ? "Das kostenlose Gemini-Kontingent ist gerade ausgeschöpft. Versuch es später noch einmal." : "Gemini-Fehler: " + msg }, busy ? 429 : 502, h);
