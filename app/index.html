@@ -672,21 +672,26 @@ function viewKader(){
   var o=owned(), h=sharedHtml();
   var imp=SHARED?'':'<div class="actions"><button class="btn sm" id="imp-shot">'+IC.image+'Aus Bild einlesen</button><button class="btn ghost sm" id="imp-cam">'+IC.camera+'Foto aufnehmen</button><button class="btn ghost sm" id="imp-paste">'+IC.text+'Text einfügen</button>'+(o.length?'<button class="btn ghost sm" id="share">'+IC.share+'Kader teilen</button>':'')+'</div>';
   if(!o.length){view.innerHTML=h+'<div class="center"><div class="empty-ic">'+IC.people+'</div><h2>Dein Kader ist leer</h2><p class="mute" style="max-width:34ch">Lies deine Aufstellung aus einem Screenshot ein oder füge Karten unter „Karten" mit + hinzu.</p></div>'+imp;return;}
-  var groups=[['Stürmer',['LW','C','RW']],['Verteidiger',['LD','RD']],['Goalies',['G']]];
-  var sal=o.reduce(function(s,c){return s+(c.sal||0);},0), ns=newSince();
-  var up=o.filter(function(c){return c.upd>ns;});
-  h+=imp+'<div class="tiles"><div class="tile"><b>'+o.length+'</b><span>Karten im Kader</span></div><div class="tile s"><b>'+money(sal)+'</b><span>Gehalt aller Karten</span></div></div>';
+  var ns=newSince(), up=o.filter(function(c){return c.upd>ns;});
+  h+=imp+'<div class="searchwrap">'+IC.search+'<input type="search" id="kq" placeholder="Im Kader suchen" aria-label="Im Kader suchen" value="'+esc(UI.kq||'')+'" autocomplete="off"></div>';
   if(up.length) h+='<p class="note ok">Aufgewertet seit deinem letzten Besuch: '+up.map(function(c){return esc(nice(c.n))+' ('+c.ovr+')';}).join(', ')+'.</p>';
-  groups.forEach(function(g){
-    var list=o.filter(function(c){return g[1].indexOf(c.pos)>=0;}).sort(function(a,b){return g[1].indexOf(a.pos)-g[1].indexOf(b.pos)||b.ovr-a.ovr;});
-    h+='<h2>'+g[0]+' <span class="count">'+list.length+'</span></h2>'+(list.length?'<div class="players kgrid">'+list.map(kTile).join('')+'</div>':'<p class="mute small">Noch keine Karte.</p>');
-  });
+  h+='<div id="kgroups">'+kGroups(o)+'</div>';
   if(UI.sel){ var n=Object.keys(UI.sel).length;
     h+='<div class="selbar" role="toolbar"><span><b>'+n+'</b> ausgewählt</span><button class="btn ghost sm" id="sel-all">Alle</button><button class="btn ghost sm" id="sel-cancel">Abbrechen</button><button class="btn sm danger" id="sel-del"'+(n?'':' disabled')+'>Entfernen</button></div>'; }
   else if(!SHARED&&o.length) h+='<p class="small mute" style="margin-top:12px">Tipp: Karte gedrückt halten, um mehrere auszuwählen und zu entfernen.</p>';
   view.innerHTML=h;
 }
 
+function kGroups(o){
+  var q=(UI.kq||'').trim().toLowerCase(), h='';
+  if(q) o=o.filter(function(c){return [c.n,c.tmn,c.ctn,c.nat,c.pos,c.lgn].join(' ').toLowerCase().indexOf(q)>=0;});
+  [['Stürmer',['LW','C','RW']],['Verteidiger',['LD','RD']],['Goalies',['G']]].forEach(function(g){
+    var list=o.filter(function(c){return g[1].indexOf(c.pos)>=0;}).sort(function(a,b){return g[1].indexOf(a.pos)-g[1].indexOf(b.pos)||b.ovr-a.ovr;});
+    if(q&&!list.length) return;
+    h+='<h2>'+g[0]+' <span class="count">'+list.length+'</span></h2>'+(list.length?'<div class="players kgrid">'+list.map(kTile).join('')+'</div>':'<p class="mute small">Noch keine Karte.</p>');
+  });
+  return h||'<p class="mute">Keine Karte im Kader passt zu „'+esc(UI.kq)+'".</p>';
+}
 function kTile(c){
   var k=key(c), xs=(c.xf||[]).map(function(x){var i=D.xf[x]; return xfLogo[x]?'<img src="'+esc(D.meta.img_base+xfLogo[x])+'" alt="'+esc(i?nice(i.n)+' '+i.t:'X-Factor')+'" title="'+esc(i?nice(i.n)+' · '+i.t+' · '+i.ap+' AP':'')+'" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">':'';}).join('');
   var on=UI.sel&&UI.sel[k];
@@ -1341,6 +1346,7 @@ document.addEventListener('click',function(e){
 view.addEventListener('input',function(e){
   var t=e.target;
   if(t.id==='q'){UI.q=t.value; UI.limit=40; results();}
+  else if(t.id==='kq'){UI.kq=t.value; var g=document.getElementById('kgroups'); if(g) g.innerHTML=kGroups(owned());}
   else if(t.dataset.stat!==undefined){var v=parseInt(t.value,10); if(v>0) UI.stat[t.dataset.stat]=v; else delete UI.stat[t.dataset.stat]; UI.limit=40; results();}
   else if(t.id==='s-cap'){S.cap=t.value; UI.up=null; save();}
   else if(t.id==='s-ap'){S.ap=t.value; save();}
