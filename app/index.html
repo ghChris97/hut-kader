@@ -303,9 +303,19 @@ body.sheet-open{overflow:hidden}
 .sug-bon{display:grid;grid-template-columns:auto 1fr;gap:4px 8px;align-items:center;margin-top:8px;font-size:12px;color:var(--faint)}
 .sug-bon .pills{gap:4px}
 .sug-bon .pill{font-size:11.5px;padding:1px 8px}
-.req{display:grid;grid-template-columns:40px 1fr auto;gap:12px;align-items:start;padding:12px 0;border-top:1px solid var(--line)}
+.req{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:start;padding:9px 0;border-top:1px solid var(--line)}
+.req b{font-size:14px} .req .pill{font-size:11px;padding:2px 6px;margin-left:4px}
+.req .rw .pill{margin-left:0}
+.req .ic.face{width:34px;height:48px;padding:0;overflow:hidden;background:none}
+.req .ic.face img{width:100%;height:100%;object-fit:cover}
+.req .need .k{font-size:11px;padding:2px 6px}
+.reqh{font:700 12px/1 var(--display);letter-spacing:.1em;text-transform:uppercase;color:var(--mute);padding:12px 0 2px;border-top:1px solid var(--line)}
+.reqh+.req{border-top:0}
+.mini{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.mini .mc{width:34px;aspect-ratio:804/1128;padding:0;border:0;background:var(--surface2);overflow:hidden;cursor:pointer}
+.mini .mc img{width:100%;height:100%;object-fit:cover;display:block}
 .req:first-child{border-top:0;padding-top:2px}
-.req .ic{width:40px;height:40px;border-radius:10px;background:var(--surface2);display:grid;place-items:center}
+.req .ic{width:34px;height:34px;border-radius:10px;background:var(--surface2);display:grid;place-items:center}
 .req .ic svg{width:26px;height:30px}
 .req b{font-weight:600}
 .req p{margin:3px 0 0;font-size:13px;color:var(--mute)}
@@ -792,15 +802,20 @@ function divName(teams){
   return '';
 }
 /* Was jeder Bonus verlangt und wie weit die Aufstellung ist */
+function mini(ps){
+  if(!ps||!ps.length) return '';
+  return '<div class="mini">'+ps.map(function(p){return '<button class="mc" data-card="'+key(p)+'" aria-label="'+esc(nice(p.n))+'">'+img(p)+'</button>';}).join('')+'</div>';
+}
 function reqHtml(r){
   var h='', cst=r.totals&&r.totals.captain;
   if(cst){
     var cc=byKey[cst.cap.k+cst.cap.id], teams=HUT.captainTeams(cst.cap,D), inL={};
     HUT.lineupPlayers(r).forEach(function(p){ if(teams[p.tm]) inL[p.tm]=(inL[p.tm]||0)+1; });
     var dn=divName(cst.cap.teams), lab=cst.type==='ability_points'?'+'+cst.boost+' FP':cst.type==='salary'?'+'+cst.boost+' M$':'+'+cst.boost;
-    h+='<div class="req"><div class="ic">'+CAPSVG.replace('class="capt"','')+'</div><div><b>Captain '+esc(cc?nice(cc.n):'')+'</b> <span class="pill a" style="margin-left:4px">'+lab+'</span>'+
-      '<p>Braucht '+cst.need+' aufgestellte Spieler aus '+(dn||'diesen Teams')+'. Der Captain selbst muss mitspielen.</p>'+
-      '<div class="need">'+Object.keys(teams).filter(function(t){return teamName[t];}).sort(function(a,b){return (inL[b]||0)-(inL[a]||0);}).map(function(t){
+    var cps=HUT.lineupPlayers(r).filter(function(p){return teams[p.tm];});
+    h+='<div class="req"><div class="ic face">'+(cc?img(cc):'')+'</div><div><b>Captain '+esc(cc?nice(cc.n):'')+'</b> <span class="pill a">'+lab+'</span>'+
+      '<p>'+cst.need+' Spieler aus '+(dn||'den Zielteams')+', Captain spielt mit</p>'+
+      mini(cps)+'<div class="need">'+Object.keys(teams).filter(function(t){return teamName[t];}).sort(function(a,b){return (inL[b]||0)-(inL[a]||0);}).map(function(t){
         var ab=(D.lists.team.filter(function(x){return String(x.id)===String(t);})[0]||{}).abbr||teamName[t];
         return '<span class="k'+(inL[t]?' hit':'')+'">'+esc(ab)+(inL[t]?' ×'+inL[t]:'')+'</span>';}).join('')+'</div></div>'+
       '<span class="st '+(cst.active?'ok':'no')+'">'+cst.count+' / '+cst.need+'</span></div>';
@@ -808,19 +823,20 @@ function reqHtml(r){
   if(S.coach){
     var co=(D.coaches||[]).filter(function(c){return c.name===S.coach;})[0];
     if(co){
+      h+='<div class="reqh">Trainer '+esc(co.name)+'</div>';
       var groups={};
       co.combos.forEach(function(c){
         var k=c.line+'|'+c.slots.map(function(sl){return sl.map(function(x){return x.name;}).join('&');}).join('+');
         (groups[k]=groups[k]||{line:c.line,slots:c.slots,combos:[]}).combos.push(c);
       });
       Object.keys(groups).forEach(function(k){
-        var g=groups[k], lines=g.line==='forwards'?r.forwards:r.defense, hit=0;
-        lines.forEach(function(l){ if(HUT.comboMatches(g.combos[0],l.players)) hit++; });
+        var g=groups[k], lines=g.line==='forwards'?r.forwards:r.defense, hit=0, hp=[];
+        lines.forEach(function(l){ if(HUT.comboMatches(g.combos[0],l.players)){ hit++; hp=hp.concat(l.players); } });
         var need=g.slots.map(function(sl){return sl.map(function(x){return x.name;}).join(' & ');});
         var cnt={}; need.forEach(function(n){cnt[n]=(cnt[n]||0)+1;});
         var txt=Object.keys(cnt).map(function(n){return cnt[n]+'× '+n;}).join(' + ');
-        h+='<div class="req"><div class="ic"><svg viewBox="0 0 24 24" style="width:22px;height:22px;stroke:var(--blue);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1-4 3.6-6 7-6s6 2 7 6"/><path d="M15.5 4.5l3-1.5"/></svg></div>'+
-          '<div><b>Trainer '+esc(co.name)+'</b><p>'+(g.line==='forwards'?'Sturmreihe':'Verteidigerpaar')+' mit '+esc(txt)+'</p><div class="rw">'+rewardPills(g.combos)+'</div></div>'+
+        h+='<div class="req"><div class="ic"><svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:var(--blue);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1-4 3.6-6 7-6s6 2 7 6"/><path d="M15.5 4.5l3-1.5"/></svg></div>'+
+          '<div><b>'+(g.line==='forwards'?'Sturm':'Abwehr')+': '+esc(txt)+'</b><div class="rw">'+rewardPills(g.combos)+'</div>'+mini(hp)+'</div>'+
           '<span class="st '+(hit?'ok':'no')+'">'+(hit?hit+'× aktiv':'nicht aktiv')+'</span></div>';
       });
     }
@@ -928,6 +944,7 @@ function nmHtml(r){
 function captainHtml(t){
   var c=t.captain; if(!c) return '';
   var card=byKey[c.cap.k+c.cap.id], lab=c.type==='ability_points'?'+'+c.boost+' AP':c.type==='salary'?'+$'+c.boost+'M':'+'+c.boost;
+  if(c.active&&UI.rv!=='det') return '';
   if(c.active) return '<p class="note ap">Captain <b>'+esc(card?nice(card.n):'')+'</b>: '+c.count+' von '+c.need+' Spielern aus den Zielteams, Bonus '+lab+' aktiv.</p>';
   return '<p class="note warn">Captain '+esc(card?nice(card.n):'')+': '+c.count+' von '+c.need+' Spielern aus den Zielteams'+(c.inLineup?'':', und die Captain-Karte ist nicht aufgestellt')+'. Der Bonus '+lab+' greift nicht.</p>';
 }
