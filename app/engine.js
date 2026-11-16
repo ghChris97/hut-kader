@@ -17,6 +17,7 @@
   function reqOk(p, r) {
     if (r.kind === 'card') return r.ids.indexOf(p.ct) >= 0;
     if (r.kind === 'team') return r.ids.indexOf(p.tm) >= 0;
+    if (r.kind === 'nationality') return r.ids.indexOf(p.nid) >= 0;
     return false;
   }
   function slotOk(p, slot) {

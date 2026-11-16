@@ -48,10 +48,10 @@ def http(path, data=None, referer="player-stats.php"):
         headers["X-Requested-With"] = "XMLHttpRequest"
         headers["Content-Type"] = "application/x-www-form-urlencoded; charset=UTF-8"
     last = None
-    for attempt in range(3):
+    for attempt in range(5 if LEGACY else 3):
         try:
             req = urllib.request.Request(BASE + path, data=body, headers=headers)
-            with urllib.request.urlopen(req, timeout=60) as r:
+            with urllib.request.urlopen(req, timeout=120 if LEGACY else 60) as r:
                 out = r.read().decode("utf-8", "replace")
             time.sleep(PAUSE)
             return out
@@ -61,6 +61,18 @@ def http(path, data=None, referer="player-stats.php"):
     raise RuntimeError(f"Abruf fehlgeschlagen: {path}: {last}")
 
 
+def row_id(r):
+    if r.get("_id") not in (None, ""):
+        return int(r["_id"])
+    m = re.search(r'id="(\d+)"', r.get("card_art") or "") or re.search(r"id=(\d+)", r.get("card_art") or "")
+    return int(m.group(1)) if m else 0
+
+
+LEGACY = False  # aeltere Seitenversion: nur einfache Sortierung, keine Zusatzfilter
+LEGACY_START = 0.0
+LEGACY_BUDGET = float(os.environ.get("LEGACY_BUDGET_MIN", "25")) * 60
+
+
 def table(endpoint, cols, referer):
     """Mehrere Durchlaeufe mit unterschiedlicher Sortierung, bis alle Karten da sind
     (bei gleichen Sortierwerten liefert die Seite sonst Dubletten/Luecken)."""
@@ -68,11 +80,14 @@ def table(endpoint, cols, referer):
     orders = [[("full_name", "asc"), ("aOVR", "asc"), ("date_added", "asc"), ("salary", "asc")],
               [("date_added", "desc"), ("full_name", "desc"), ("aOVR", "desc")],
               [("overall", "asc"), ("team", "asc"), ("full_name", "asc"), ("weight", "asc")]]
+    if LEGACY:
+        # der alte Server ist langsam und bricht bei Sortierung mit grossem Versatz ab: erst unsortiert lesen
+        orders = [[], [("full_name", "asc")]]
     for order in orders:
         order = [(c, d) for c, d in order if c in cols]
         rows, total = table_pass(endpoint, cols, referer, order)
         for r in rows:
-            seen[(r["_id"], r.get("_msp"))] = r
+            seen[(row_id(r), r.get("_msp"))] = r
         print(f"  eindeutig: {len(seen)}/{total}", flush=True)
         if len(seen) >= total:
             break
@@ -83,21 +98,24 @@ def table_params(cols, order, start, length):
     p = [("draw", "1")]
     for i, c in enumerate(cols):
         p += [(f"columns[{i}][data]", c), (f"columns[{i}][name]", ""), (f"columns[{i}][searchable]", "true"),
-              (f"columns[{i}][orderable]", "false" if c in NOT_ORDERABLE else "true"),
+              (f"columns[{i}][orderable]", "false" if c in NOT_ORDERABLE or (LEGACY and c == "card_art") else "true"),
               (f"columns[{i}][search][value]", ""), (f"columns[{i}][search][regex]", "false")]
     for i, (c, d) in enumerate(order):
         p += [(f"order[{i}][column]", str(cols.index(c))), (f"order[{i}][dir]", d)]
     p += [("start", str(start)), ("length", str(length)), ("search[value]", ""), ("search[regex]", "false")]
-    for k in ["card_type", "team", "league", "nationality", "xfactor"]:
-        p += [(f"filter_{k}_ids", ""), (f"exclude_{k}_ids", "")]
-    p += [("abilities_match", "all")]
+    if not LEGACY:
+        for k in ["card_type", "team", "league", "nationality", "xfactor"]:
+            p += [(f"filter_{k}_ids", ""), (f"exclude_{k}_ids", "")]
+        p += [("abilities_match", "all")]
     return p
 
 
 def table_pass(endpoint, cols, referer, order):
     rows, start, total = [], 0, None
     while total is None or start < total:
-        d = json.loads(http(endpoint, table_params(cols, order, start, PAGE), referer))
+        if LEGACY and time.time() - LEGACY_START > LEGACY_BUDGET:
+            raise RuntimeError("Zeitbudget fuer die alte Version aufgebraucht")
+        d = json.loads(http(endpoint, table_params(cols, order, start, 200 if LEGACY else PAGE), referer))
         total = int(d["recordsFiltered"])
         if not d["data"]:
             break
@@ -186,14 +204,15 @@ def card(row, kind, maps):
     sal = num(row.get("salary"))
     wgt = num(row.get("weight"))
     return {
-        "id": int(row["_id"]),
+        "id": row_id(row),
         "k": kind,
         "n": text(row.get("full_name")),
-        "ct": maps["card"].get(row.get("card_logo") or "", 0),
+        "ct": maps["card"].get(row.get("card_logo") or "", 0) or maps.get("card_abbr", {}).get(row.get("card") or "", 0),
         "ctn": row.get("card") or "",
         "tm": maps["team"].get(row.get("team_logo") or "", 0) or maps["team_abbr"].get(row.get("team") or "", 0),
         "tmn": row.get("team") or "",
-        "lg": maps["league"].get(row.get("league_logo") or "", 0),
+        "lg": maps["league"].get(row.get("league_logo") or "", 0) or maps.get("league_name", {}).get(row.get("league") or "", 0),
+        "nid": maps.get("nat", {}).get(row.get("nationality") or "", 0),
         "lgn": row.get("league") or "",
         "nat": row.get("nationality") or "",
         "pos": row.get("position") or ("G" if kind == "g" else ""),
@@ -233,6 +252,55 @@ def parse_combos(s):
                 slots.append(reqs)
             out.append({"line": line, "type": bt, "boost": ba, "slots": slots})
     return out
+
+
+def parse_combos_legacy(s):
+    out = []
+    for line in ("forwards", "defense"):
+        i = s.find(f'id="{line}_chemistry_table"')
+        if i < 0:
+            continue
+        j = s.find('_chemistry_table"', i + 30)
+        part = s[i:j if j > 0 else len(s)]
+        for r in part.split('class="table-row chemistry_table_content"')[1:]:
+            b = re.search(r'class="boost_amount">\s*([^<]+)<', r)
+            if not b:
+                continue
+            bt = b.group(1).upper()
+            typ = "salary" if "SAL" in bt else ("ability_points" if "AP" in bt else "overall")
+            slots = []
+            for m in re.finditer(r'combo_selector (\w+)"\s*data-selector_id="(\d+)"', r):
+                slots.append([{"kind": m.group(1), "ids": [int(m.group(2))], "name": ""}])
+            if slots:
+                out.append({"line": line, "type": typ, "boost": num(bt), "slots": slots})
+    return out
+
+
+def options(html_text, select_re):
+    m = re.search(select_re + r'[^>]*>(.*?)</select>', html_text, re.S)
+    if not m:
+        return []
+    return [(v, html.unescape(t).strip()) for v, t in re.findall(r'<option[^>]*value="([^"]*)"[^>]*>([^<]*)', m.group(1)) if v != ""]
+
+
+def legacy_lists(stats_html, combos_html):
+    """Listen der aelteren Seitenversion aus den Auswahlfeldern zusammensetzen (IDs aus der Combo-Seite)."""
+    ct_abbr = {name: ab for ab, name in options(stats_html, r'<select name="card_search"')}
+    tm_abbr = {name: ab for ab, name in options(stats_html, r'<select id="team_id"')}
+    card_type = [{"id": int(i), "name": n, "abbr": ct_abbr.get(n, ""), "logo": ""} for i, n in options(combos_html, r'<select id="filter-card"')]
+    team = [{"id": int(i), "name": n, "abbr": tm_abbr.get(n, ""), "logo": "", "group": ""} for i, n in options(combos_html, r'<select id="filter-team"')]
+    nationality = [{"id": int(i), "name": n, "abbr": n, "logo": ""} for i, n in options(combos_html, r'<select id="filter-nationality"')]
+    league = [{"id": k + 1, "name": n, "abbr": v, "logo": ""} for k, (v, n) in enumerate(options(stats_html, r'<select id="league_id"'))]
+    names = {}
+    for kind, items in (("card", card_type), ("team", team), ("nationality", nationality)):
+        for it in items:
+            names[(kind, it["id"])] = it["name"]
+    return {"card_type": card_type, "team": team, "league": league, "nationality": nationality, "xfactor": []}, names
+
+
+def page_columns(page_html):
+    m = re.search(r'"columns":\s*\[(.*?)\]\s*,\s*"', page_html, re.S) or re.search(r'"columns":\s*\[(.*?)\]\s*\}\s*\)', page_html, re.S)
+    return re.findall(r'"data":\s*"([^"]+)"', m.group(1)) if m else []
 
 
 def parse_xfactors(s, items):
@@ -306,31 +374,51 @@ def parse_coaches(s, name_ids):
     return out
 
 
-def main(outdir):
-    global BASE
-    out = Path(outdir)
-    out.mkdir(parents=True, exist_ok=True)
-    print("Version ...", flush=True)
-    version = pinned_version(Path(__file__).resolve().parent.parent)
+def build_version(version):
+    """Alle Daten einer NHL-Version. Neue Seitenversion (ab NHL 27) per API, aeltere ueber die Seiten selbst."""
+    global BASE, LEGACY
     BASE = f"{SITE}NHL{version}/"
-    print(f"Eingestellt: NHL {version}", flush=True)
-    newer = newer_version(version)
-    print("Listen ...", flush=True)
-    lists = {k: select_list(k) for k in ["card_type", "team", "league", "nationality", "xfactor"]}
-    maps = {
-        "card": {base(i["logo"]): to_id(i["id"]) for i in lists["card_type"]},
-        "team": {base(i["logo"]): int(i["id"]) for i in lists["team"]},
-        "league": {base(i["logo"]): int(i["id"]) for i in lists["league"]},
-    }
-    abbr_count = {}
-    for i in lists["team"]:
-        abbr_count[i["abbr"]] = abbr_count.get(i["abbr"], 0) + 1
-    # Ersatz, falls das Logo nicht zuzuordnen ist: nur eindeutige Kuerzel
-    maps["team_abbr"] = {i["abbr"]: int(i["id"]) for i in lists["team"] if abbr_count[i["abbr"]] == 1}
+    print(f"== NHL {version} ==", flush=True)
+    legacy = False
+    try:
+        lists = {k: select_list(k) for k in ["card_type", "team", "league", "nationality", "xfactor"]}
+    except RuntimeError as e:
+        if "404" not in str(e):
+            raise
+        legacy = True
+    LEGACY = legacy
+    if legacy:
+        global LEGACY_START
+        LEGACY_START = time.time()
+        stats_html = http("player-stats.php", referer="player-stats.php")
+        goalie_html = http("goalie-stats.php", referer="goalie-stats.php")
+        combos_html = http("chemistry-combos.php", referer="chemistry-combos.php")
+        lists, names = legacy_lists(stats_html, combos_html)
+        sk_cols, go_cols = page_columns(stats_html), page_columns(goalie_html)
+        maps = {"card": {}, "team": {}, "league": {},
+                "card_abbr": {i["abbr"]: i["id"] for i in lists["card_type"] if i["abbr"]},
+                "league_name": {i["name"]: i["id"] for i in lists["league"]}}
+        cnt = {}
+        for i in lists["team"]:
+            cnt[i["abbr"]] = cnt.get(i["abbr"], 0) + 1
+        maps["team_abbr"] = {i["abbr"]: i["id"] for i in lists["team"] if i["abbr"] and cnt[i["abbr"]] == 1}
+    else:
+        sk_cols, go_cols = SKATER_COLS, GOALIE_COLS
+        maps = {
+            "card": {base(i["logo"]): to_id(i["id"]) for i in lists["card_type"]},
+            "team": {base(i["logo"]): int(i["id"]) for i in lists["team"]},
+            "league": {base(i["logo"]): int(i["id"]) for i in lists["league"]},
+        }
+        abbr_count = {}
+        for i in lists["team"]:
+            abbr_count[i["abbr"]] = abbr_count.get(i["abbr"], 0) + 1
+        maps["team_abbr"] = {i["abbr"]: int(i["id"]) for i in lists["team"] if abbr_count[i["abbr"]] == 1}
+    maps["nat"] = {i["name"]: to_id(i["id"]) for i in lists["nationality"]}
+
     print("Feldspieler ...", flush=True)
-    sk, sk_total = table("php/player_stats.php", SKATER_COLS, "player-stats.php")
+    sk, sk_total = table("php/player_stats.php", sk_cols, "player-stats.php")
     print("Goalies ...", flush=True)
-    go, go_total = table("php/goalie_stats.php", GOALIE_COLS, "goalie-stats.php")
+    go, go_total = table("php/goalie_stats.php", go_cols, "goalie-stats.php")
     cards = {}
     for r in sk:
         c = card(r, "s", maps)
@@ -341,9 +429,14 @@ def main(outdir):
     cards = sorted(cards.values(), key=lambda c: (-c["ovr"], c["n"], c["id"]))
 
     print("Chemistry Combos ...", flush=True)
-    combos_html = http("chemistry-combos.php", referer="chemistry-combos.php")
-    combos = parse_combos(combos_html)
-    # Namen -> IDs (inkl. Alias-IDs aus den Combos) fuer die Coach-Anforderungen
+    if legacy:
+        combos = parse_combos_legacy(combos_html)
+        for c in combos:
+            for sl in c["slots"]:
+                for r in sl:
+                    r["name"] = names.get((r["kind"], r["ids"][0]), "")
+    else:
+        combos = parse_combos(http("chemistry-combos.php", referer="chemistry-combos.php"))
     name_ids = {}
     for i in lists["team"]:
         name_ids[i["name"]] = ("team", [int(i["id"])])
@@ -352,13 +445,8 @@ def main(outdir):
     for c in combos:
         for sl in c["slots"]:
             for r in sl:
-                name_ids[r["name"]] = (r["kind"], r["ids"])
-    print("Coaches ...", flush=True)
-    try:  # Coaches sind optional, falls eine kuenftige Version sie nicht mehr hat
-        coaches = parse_coaches(http("coaches.php", referer="coaches.php"), name_ids)
-    except Exception as e:  # noqa: BLE001
-        print(f"  Coaches uebersprungen: {e}", flush=True)
-        coaches = []
+                if r["name"]:
+                    name_ids[r["name"]] = (r["kind"], r["ids"])
 
     def optional(label, fn, default):
         try:
@@ -367,11 +455,11 @@ def main(outdir):
             print(f"  {label} uebersprungen: {e}", flush=True)
             return default
 
-    print("X-Factors und Captains ...", flush=True)
+    print("Coaches, X-Factors, Captains ...", flush=True)
+    coaches = optional("Coaches", lambda: parse_coaches(http("coaches.php", referer="coaches.php"), name_ids), [])
     xf = optional("X-Factors", lambda: parse_xfactors(http("xfactor-glossary.php", referer="xfactor-glossary.php"), lists["xfactor"]), {})
     captains = optional("Captains", lambda: parse_captains(http("builder.php", referer="builder.php")), [])
 
-    # Plausibilitaet: lieber abbrechen als kaputte Daten veroeffentlichen
     n_s = sum(1 for c in cards if c["k"] == "s")
     n_g = len(cards) - n_s
     problems = []
@@ -381,23 +469,80 @@ def main(outdir):
         problems.append(f"Goalies unvollstaendig: {n_g}/{go_total}")
     if not combos:
         problems.append("keine Chemistry Combos gefunden (Seitenaufbau geaendert?)")
+    unmapped = sum(1 for c in cards if not c["tm"] or not c["ct"])
+    if unmapped > 0.05 * max(1, len(cards)):
+        problems.append(f"{unmapped} Karten ohne Team/Kartentyp-Zuordnung")
     if problems:
-        sys.exit("ABBRUCH: " + "; ".join(problems))
+        raise RuntimeError("; ".join(problems))
 
     meta = {
         "updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "game": f"NHL {version}", "version": version, "newer": newer,
+        "game": f"NHL {version}", "version": version, "newer": None,
         "source": f"nhlhutbuilder.com (NHL {version})",
         "skaters": n_s, "goalies": n_g, "combos": len(combos), "coaches": len(coaches),
-        "xfactors": len(xf), "captains": len(captains),
+        "xfactors": len(xf), "captains": len(captains), "legacy": legacy,
         "skater_attrs": SKATER_ATTRS, "goalie_attrs": GOALIE_ATTRS,
         "img_base": BASE,
     }
-    data = {"meta": meta, "lists": lists, "cards": cards, "combos": combos, "coaches": coaches,
-            "xf": xf, "captains": captains}
-    (out / "hut.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    (out / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
-    print(json.dumps({k: v for k, v in meta.items() if k not in ("skater_attrs", "goalie_attrs")}))
+    print(json.dumps({k: v for k, v in meta.items() if k not in ("skater_attrs", "goalie_attrs")}), flush=True)
+    return {"meta": meta, "lists": lists, "cards": cards, "combos": combos, "coaches": coaches, "xf": xf, "captains": captains}
+
+
+def wanted_versions(root):
+    """version.txt: erste Zahl = Standard, weitere = zusaetzlich waehlbar (z. B. '27,26'). HUT_VERSION erzwingt eine."""
+    forced = os.environ.get("HUT_VERSION", "").strip()
+    if forced:
+        return [int(forced)]
+    f = Path(root) / "version.txt"
+    vs = [int(x) for x in re.findall(r"\d{2}", f.read_text())] if f.exists() else []
+    return vs or [27]
+
+
+def main(outdir):
+    out = Path(outdir)
+    out.mkdir(parents=True, exist_ok=True)
+    versions = wanted_versions(Path(__file__).resolve().parent.parent)
+    default = versions[0]
+    newer = newer_version(max(versions))
+    if newer and newer["version"] not in versions:
+        versions.append(newer["version"])  # neue Version ist sofort waehlbar, Standard bleibt unveraendert
+    built = []
+    max_age_days = float(os.environ.get("OLD_VERSION_MAX_AGE_DAYS", "7"))
+    for v in versions:
+        try:
+            data = None
+            cached = out / f"hut-{v}.json"
+            if v != default and cached.exists():
+                # aeltere Spiele aendern sich kaum: hoechstens einmal pro Woche neu abrufen
+                try:
+                    old = json.loads(cached.read_text(encoding="utf-8"))
+                    age = datetime.now(timezone.utc) - datetime.strptime(old["meta"]["updated"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                    if age.total_seconds() < max_age_days * 86400:
+                        data = old
+                        print(f"== NHL {v}: Daten vom {old['meta']['updated']} wiederverwendet ==", flush=True)
+                except Exception:  # noqa: BLE001
+                    data = None
+            if data is None and v != default and os.environ.get("SKIP_OLD") == "1":
+                print(f"  NHL {v}: kein Zwischenstand, Abruf erst beim naechtlichen Lauf", flush=True)
+                continue
+            if data is None:
+                data = build_version(v)
+        except Exception as e:  # noqa: BLE001
+            if v == default:
+                sys.exit(f"ABBRUCH bei NHL {v}: {e}")
+            print(f"  NHL {v} uebersprungen: {e}", flush=True)
+            continue
+        if v == default:
+            data["meta"]["newer"] = newer if newer and newer["version"] > v else None
+        (out / f"hut-{v}.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        if v == default:
+            (out / "hut.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+            (out / "meta.json").write_text(json.dumps(data["meta"], ensure_ascii=False, indent=1), encoding="utf-8")
+        built.append({"version": v, "game": f"NHL {v}", "updated": data["meta"]["updated"],
+                      "skaters": data["meta"]["skaters"], "goalies": data["meta"]["goalies"]})
+    manifest = {"default": default, "versions": sorted(built, key=lambda x: -x["version"])}
+    (out / "versions.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(json.dumps(manifest))
 
 
 if __name__ == "__main__":

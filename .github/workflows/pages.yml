@@ -28,10 +28,23 @@ jobs:
         with:
           python-version: "3.12"
       # Schlägt der Abruf fehl, bricht der Lauf hier ab und die bisherige Seite bleibt online.
+      # Daten älterer Spiele zwischenspeichern, damit sie nur einmal pro Woche abgerufen werden
+      - name: Woche bestimmen
+        id: wk
+        run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: data
+          key: hutdata-${{ steps.wk.outputs.week }}-${{ github.run_id }}
+          restore-keys: |
+            hutdata-${{ steps.wk.outputs.week }}-
+            hutdata-
       - name: Kartendaten abrufen
         run: |
+          # ältere Spiele nur beim nächtlichen oder manuellen Lauf neu abrufen, nicht bei jedem Push
+          if [ "${{ github.event_name }}" = "push" ]; then export SKIP_OLD=1; fi
           python3 scraper/scrape.py data
-          cp data/hut.json app/hut.json
+          cp data/hut*.json data/versions.json app/
           # Versionskennung in alle Dateiverweise, damit nie alte und neue Dateien gemischt werden
           BUILD="${GITHUB_SHA::7}-$(date -u +%y%m%d%H%M)"
           sed -i "s/__BUILD__/$BUILD/g" app/index.html app/sw.js
