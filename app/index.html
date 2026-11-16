@@ -64,6 +64,18 @@ h3{font:600 12px/1.2 var(--body);letter-spacing:.1em;text-transform:uppercase;ma
 p{margin:0 0 10px}
 .mute{color:var(--mute)} .small{font-size:13px}
 .lead{font-size:13px;color:var(--mute);margin:2px 0 12px}
+.fchips{gap:6px}
+.fchips .chip{padding:6px 12px;font-size:13px}
+.fsep{flex:none;width:1px;background:var(--line);margin:4px 2px}
+.fsel{display:grid;grid-template-columns:1.1fr .8fr 1.3fr auto;gap:6px}
+.fsel select{padding:8px 22px 8px 9px;font-size:13.5px;min-width:0;background-position:right 6px center}
+.fsel .chip{padding:0 12px;display:grid;place-items:center}
+.logos{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;margin-top:5px}
+.lgi{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--mute);min-width:0}
+.lgi em{font-style:normal;white-space:nowrap}
+.lg{width:20px;height:20px;object-fit:contain;flex:none}
+.lg.flag{width:22px;height:15px;object-fit:cover;border-radius:1px}
+.meta .sal{color:var(--sal)}
 
 /* Eingaben */
 .filters{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
@@ -83,8 +95,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--line2);outline:none}
 .list{display:flex;flex-direction:column;gap:8px}
 .row{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);transition:border-color .15s,transform .1s}
 .row.own{border-color:rgba(79,214,160,.45)}
-.rowhead{display:grid;grid-template-columns:58px 1fr auto;gap:12px;align-items:center;padding:8px 8px 8px 8px}
-.art{position:relative;width:58px;aspect-ratio:804/1128;border-radius:6px;overflow:hidden;background:var(--surface2);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none}
+.rowhead{display:grid;grid-template-columns:54px 1fr auto;gap:12px;align-items:center;padding:8px 8px 8px 8px}
+.art{position:relative;width:54px;aspect-ratio:804/1128;border-radius:6px;overflow:hidden;background:var(--surface2);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none}
 .art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .ovr{font:700 22px/1 var(--display);color:var(--ovr);text-align:center;font-variant-numeric:tabular-nums}
 .ovr small{display:block;font:600 10px/1.3 var(--display);color:var(--mute);letter-spacing:.08em}
@@ -163,7 +175,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--line2);outline:none}
 .rq img{width:18px;height:18px;object-fit:contain}
 .amp,.plus{color:var(--faint);font-size:12px;margin:0 1px}
 .k img{width:14px;height:14px;object-fit:contain;vertical-align:-2px;margin-right:3px}
-.nm{padding:10px 0;border-top:1px solid var(--line)} .nm:first-of-type{border-top:0}
+.nmx{padding:10px 0;border-top:1px solid var(--line)} .nmx:first-of-type{border-top:0}
 .nmh{display:flex;justify-content:space-between;align-items:center}
 .nmrow{display:flex;gap:8px;align-items:center;margin-top:8px}
 .nmout{display:flex;flex-direction:column;align-items:center;font-size:11px;color:#ff6b62}
@@ -385,7 +397,7 @@ nav .badge{background:var(--accent);color:#0c1218}
 .row,.tile,.line,.card,details,.note,.kv div,input[type=search],input[type=number],input[type=text],select,textarea,.seg{border-radius:3px}
 .row,.tile,.line,.card,details{background:var(--surface);border:1px solid var(--line);backdrop-filter:blur(2px)}
 .row.own{border-color:rgba(47,196,238,.55);box-shadow:inset 3px 0 0 var(--accent)}
-.nm{font:700 18px/1.15 var(--display);letter-spacing:.04em;text-transform:uppercase}
+.nm{font:700 17px/1.15 var(--display);letter-spacing:.04em;text-transform:uppercase}
 .art,.pl .img,.ver .img,.slot .img,.sug-line .m .img{border-radius:2px}
 .k{border-radius:2px;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12);font:700 12px/1.5 var(--display);letter-spacing:.08em}
 .badge-ovr{border-radius:2px}
@@ -511,6 +523,7 @@ var IC={
   plus:'<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
   check:'<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
   x:'<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  filter:'<svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round"><path d="M4 6h16M7 12h10M10 18h4"/></svg>',
   down:'<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>',
   search:'<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
   image:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>',
@@ -536,7 +549,11 @@ function inches(h){var m=/(\d+)'\s*(\d+)/.exec(h||''); return m?(+m[1])*12+(+m[2
 
 function sub(c){
   var v=S.useRating&&c.k==='s'?'<span class="sep">·</span><span>Wert '+valFn()(c).toFixed(1)+'</span>':'';
-  return '<span class="meta"><span class="badge-ovr'+tier(c.ovr)+'">'+c.ovr+'</span><span class="k">'+esc(c.pos)+'</span><span class="k">'+esc(c.ctn)+'</span><span>'+esc(c.tmn)+'</span><span class="sep">·</span><span>'+money(c.sal||0)+'</span>'+v+'</span>';
+  var ct=(D.lists.card_type.filter(function(x){return String(x.id)===String(c.ct);})[0]||{});
+  return '<span class="meta"><span class="badge-ovr'+tier(c.ovr)+'">'+c.ovr+'</span><span class="k">'+esc(c.pos)+(c.hand?' '+c.hand:'')+'</span><span class="sal">'+money(c.sal||0)+'</span>'+v+'</span>'+
+    '<span class="logos">'+(ct.logo?'<span class="lgi">'+lg(ct.logo,ct.name||c.ctn)+'<em>'+esc(ct.name||c.ctn)+'</em></span>':'<span class="lgi"><em>'+esc(c.ctn)+'</em></span>')+
+    '<span class="lgi">'+lg(logoOf('team',c.tm),c.tmn)+'<em>'+esc(c.tmn)+'</em></span>'+
+    (c.nat?'<span class="lgi">'+lg(natLogo(c.nat),c.nat,'lg flag')+'</span>':'')+'</span>';
 }
 /* Kartenbild direkt von der Quelle, erst beim Scrollen geladen. Laedt es nicht, bleibt die OVR-Zahl stehen. */
 function img(c,cls){
@@ -677,11 +694,12 @@ function viewKarten(){
   SAL.forEach(function(l,i){sorts.push(['a'+i,'Sortiert nach '+l]);});
   var h=newerHtml(false)+'<div class="filters">'+
     '<div class="searchwrap">'+IC.search+'<input type="search" id="q" placeholder="Spieler suchen" aria-label="Spielername suchen" value="'+esc(UI.q)+'" autocomplete="off"></div>'+
-    '<div class="chips scroll" role="group" aria-label="Position">'+pos.map(function(p){return '<button class="chip" data-pos="'+p[0]+'" aria-pressed="'+(UI.pos===p[0])+'">'+p[1]+'</button>';}).join('')+'</div>'+
-    '<div class="chips scroll"><button class="chip" id="f-new" aria-pressed="'+UI.onlyNew+'">Neu ('+nNew+')</button><button class="chip" id="f-mine" aria-pressed="'+UI.onlyMine+'">Meine</button><button class="chip" id="f-more" aria-pressed="'+UI.more+'">Stat-Filter'+(nStat?' ('+nStat+')':'')+'</button></div>'+
-    '<div class="two"><select id="f-type" aria-label="Kartentyp"><option value="">Alle Kartentypen</option>'+types.map(function(t){return opt(t.abbr,t.name,UI.type);}).join('')+'</select>'+
-    '<select id="f-min" aria-label="Mindest-Overall"><option value="">Jede Stärke</option>'+[80,84,86,88,90,92].map(function(v){return opt(v,'ab '+v+' OVR',UI.min);}).join('')+'</select></div>'+
-    '<select id="f-sort" aria-label="Sortierung">'+sorts.map(function(o){return opt(o[0],o[1],UI.sort);}).join('')+'</select>';
+    '<div class="chips scroll fchips" role="group" aria-label="Position">'+pos.map(function(p){return '<button class="chip" data-pos="'+p[0]+'" aria-pressed="'+(UI.pos===p[0])+'">'+p[1]+'</button>';}).join('')+
+      '<span class="fsep"></span><button class="chip" id="f-new" aria-pressed="'+UI.onlyNew+'">Neu '+nNew+'</button><button class="chip" id="f-mine" aria-pressed="'+UI.onlyMine+'">Meine</button></div>'+
+    '<div class="fsel"><select id="f-type" aria-label="Kartentyp"><option value="">Typ</option>'+types.map(function(t){return opt(t.abbr,t.name,UI.type);}).join('')+'</select>'+
+    '<select id="f-min" aria-label="Mindest-Overall"><option value="">OVR</option>'+[80,84,86,88,90,92].map(function(v){return opt(v,'ab '+v,UI.min);}).join('')+'</select>'+
+    '<select id="f-sort" aria-label="Sortierung">'+sorts.map(function(o){return opt(o[0],o[1].replace('Sortiert nach ','').replace(' zuerst',''),UI.sort);}).join('')+'</select>'+
+    '<button class="chip" id="f-more" aria-pressed="'+UI.more+'" aria-label="Weitere Filter">'+IC.filter+(nStat?' '+nStat:'')+'</button></div>';
   if(UI.more){
     h+='<div class="card"><div class="two" style="margin-bottom:10px">'+
       '<select id="f-xf" aria-label="X-Factor"><option value="">Jeder X-Factor</option>'+Object.keys(xfNames).sort().map(function(n){return opt(n,n,UI.xf);}).join('')+'</select>'+
@@ -754,6 +772,12 @@ function logoOf(kind,id){
   if(!LOGO){ LOGO={card:{},team:{},nationality:{}}; [['card','card_type'],['team','team'],['nationality','nationality']].forEach(function(k){ (D.lists[k[1]]||[]).forEach(function(x){ if(x.logo) LOGO[k[0]][String(x.id)]=x.logo; }); }); }
   return (LOGO[kind]||{})[String(id)]||'';
 }
+function natLogo(name){
+  if(!LOGO) logoOf('card',0);
+  if(!LOGO.natName){ LOGO.natName={}; (D.lists.nationality||[]).forEach(function(x){ if(x.logo) LOGO.natName[x.name]=x.logo; }); }
+  return LOGO.natName[name]||'';
+}
+function lg(path,alt,cls){return path?'<img class="'+(cls||'lg')+'" src="'+esc(D.meta.img_base+path)+'" alt="'+esc(alt)+'" title="'+esc(alt)+'" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">':'';}
 function reqChip(r){
   var lg=logoOf(r.kind,(r.ids||[])[0]);
   return '<span class="rq">'+(lg?'<img src="'+esc(D.meta.img_base+lg)+'" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">':'')+esc(r.name)+'</span>';
@@ -966,7 +990,7 @@ function nmHtml(r){
   if(!ms.length) return '<p class="small mute">Gerade fehlt keiner Reihe genau eine Karte für einen weiteren Bonus.</p>';
   return '<p class="small mute" style="margin-top:0">Diesen Reihen fehlt genau <b>eine</b> passende Karte für einen weiteren Bonus. Links der Spieler, der raus müsste, rechts Karten, die passen würden.</p>'+ms.map(function(m){
     var fl=HUT.fillers(D,m,r,4);
-    return '<div class="nm"><div class="nmh"><strong>'+m.where+'</strong><span class="pill '+(m.combo.type==='overall'?'o':m.combo.type==='ability_points'?'a':'s')+'">'+boostLabel(m.combo)+'</span></div>'+
+    return '<div class="nmx"><div class="nmh"><strong>'+m.where+'</strong><span class="pill '+(m.combo.type==='overall'?'o':m.combo.type==='ability_points'?'a':'s')+'">'+boostLabel(m.combo)+'</span></div>'+
       '<div class="combo">'+comboHtml(m.combo)+'</div>'+
       '<div class="nmrow"><div class="nmout">'+mini([m.replace])+'<span>raus</span></div><div class="nmarr">→</div><div class="nmin"><div class="small">Gesucht: '+reqSlot(m.slot)+'</div>'+
       (fl.length?'<div class="mini">'+fl.map(function(f){return '<button class="mc'+(f.owned?' own':'')+'" data-card="'+key(f.card)+'" aria-label="'+esc(nice(f.card.n))+' '+f.card.ovr+'">'+img(f.card)+'<i>'+f.card.ovr+'</i></button>';}).join('')+'</div>':'<div class="small mute">Keine passende Karte gefunden.</div>')+
