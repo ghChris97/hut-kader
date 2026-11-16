@@ -61,6 +61,7 @@ Deno.serve(async (req) => {
   if (!image || image.length > MAX_BYTES) return json({ error: "Bild fehlt oder ist zu groß." }, 400, h);
 
   let res: Response | null = null, out: any = null, model = "";
+  const tried: string[] = [];
   for (const m of MODELS) {
     model = m;
     res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
@@ -73,6 +74,7 @@ Deno.serve(async (req) => {
     });
     out = await res.json().catch(() => null);
     const msg = String(out?.error?.message ?? "");
+    tried.push(`${m}:${res.status}`);
     // abgeschaltet, ueberlastet oder Kontingent dieses Modells leer: naechstes Modell probieren
     const skip = res.status === 404 || res.status === 503 || res.status === 429 ||
       /no longer available|not found|not supported|high demand|overloaded|unavailable|quota/i.test(msg);
@@ -87,6 +89,9 @@ Deno.serve(async (req) => {
   try {
     const parsed = JSON.parse(text);
     const cards = Array.isArray(parsed?.cards) ? parsed.cards : [];
+    // Protokoll zur Fehlersuche: welches Modell, wie viele Karten, welche Namen (keine Bilddaten)
+    console.log(JSON.stringify({ tried, model, n: cards.length, imgKB: Math.round(image.length * 0.75 / 1024),
+      names: cards.map((c: { name?: string; ovr?: number }) => `${c.name} ${c.ovr}`) }));
     return json({ cards, model }, 200, h);
   } catch {
     return json({ error: "Gemini hat keine lesbare Liste geliefert." }, 502, h);

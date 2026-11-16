@@ -697,6 +697,7 @@ function viewImport(){
   h+='</div>';
   if(bad.length) h+='<p class="note warn" style="margin-top:10px">Nicht in den Kartendaten gefunden: '+bad.map(function(f){return esc(f.token)+(f.ovr?' ('+f.ovr+')':'');}).join(', ')+'. Such sie unter Karten von Hand.</p>';
   h+='<div class="btns" style="margin-top:14px"><button class="btn" id="imp-ok">'+n+(n===1?' Karte':' Karten')+' übernehmen</button><button class="btn ghost" id="imp-x">Abbrechen</button></div>';
+  if(I.raw) h+='<details><summary>Von Gemini gelesen ('+I.raw.length+')</summary><div><p class="small mute">'+I.raw.map(function(r){return esc(r.name)+' '+esc(r.ovr)+(r.pos?' '+esc(r.pos):'');}).join('<br>')+'</p></div></details>';
   view.innerHTML=h;
 }
 
