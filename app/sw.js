@@ -1,6 +1,6 @@
 /* Macht die App installierbar und offline nutzbar.
    Immer zuerst das Netz fragen (damit Updates sofort ankommen), sonst die letzte gespeicherte Fassung. */
-var CACHE = 'hutkader-v3';
+var CACHE = 'hutkader-v4';
 var SHELL = ['./', 'index.html', 'engine.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', function (e) {
