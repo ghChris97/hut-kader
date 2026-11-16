@@ -157,7 +157,22 @@ input:focus,select:focus,textarea:focus{border-color:var(--line2);outline:none}
 .pl .n{font:600 13px/1.2 var(--body);overflow-wrap:anywhere}
 .pl .v{font-size:11.5px;color:var(--mute);font-variant-numeric:tabular-nums;margin-top:1px}
 .players.n5 .n,.players.n4 .n{font-size:11.5px}
-.combo{font-size:12.5px;color:var(--mute);display:flex;gap:6px;align-items:baseline}
+.combo{font-size:12.5px;color:var(--mute);display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:4px}
+.combo b{color:var(--ice);margin-left:2px}
+.rq{display:inline-flex;align-items:center;gap:4px;padding:2px 6px 2px 3px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:var(--ice);font-size:12px;white-space:nowrap;border-radius:2px}
+.rq img{width:18px;height:18px;object-fit:contain}
+.amp,.plus{color:var(--faint);font-size:12px;margin:0 1px}
+.k img{width:14px;height:14px;object-fit:contain;vertical-align:-2px;margin-right:3px}
+.nm{padding:10px 0;border-top:1px solid var(--line)} .nm:first-of-type{border-top:0}
+.nmh{display:flex;justify-content:space-between;align-items:center}
+.nmrow{display:flex;gap:8px;align-items:center;margin-top:8px}
+.nmout{display:flex;flex-direction:column;align-items:center;font-size:11px;color:#ff6b62}
+.nmout .mini{margin:0}
+.nmarr{color:var(--faint);font-size:18px}
+.nmin{flex:1;min-width:0}
+.mini .mc{position:relative}
+.mini .mc i{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);color:#fff;font:700 10px/1.4 var(--body);font-style:normal;text-align:center}
+.mini .mc.own{outline:2px solid var(--sal);outline-offset:-2px}
 .combo:before{content:"";flex:none;width:6px;height:6px;border-radius:50%;background:var(--ovr);transform:translateY(-1px)}
 
 /* Hinweise, Felder */
@@ -180,6 +195,11 @@ details>summary::-webkit-details-marker{display:none}
 details>summary:after{content:"";width:8px;height:8px;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:rotate(45deg);transition:transform .2s;margin-right:4px}
 details[open]>summary:after{transform:rotate(-135deg)}
 details>div{padding:0 14px 14px}
+details.sg{margin-top:8px}
+details.sg>summary{padding:11px 14px}
+details.sg>summary>span{display:flex;flex-direction:column;gap:3px;min-width:0}
+details.sg>summary small{font:400 12.5px/1.3 var(--body);color:var(--mute);text-transform:none;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+details.sg .field{margin-bottom:12px}
 .statgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
 .statgrid label{display:flex;flex-direction:column;gap:4px;font:600 11px/1.2 var(--body);letter-spacing:.06em;color:var(--mute)}
 .statgrid input,.statgrid select{min-height:38px;padding:6px 10px}
@@ -729,6 +749,17 @@ function pillsFor(b){
 }
 function boostLabel(c){return c.type==='overall'?'+'+c.boost+' OVR':c.type==='ability_points'?'+'+c.boost+' AP':'+$'+c.boost+'M';}
 function slotText(s){return s.map(function(r){return r.name;}).join(' & ');}
+var LOGO=null;
+function logoOf(kind,id){
+  if(!LOGO){ LOGO={card:{},team:{},nationality:{}}; [['card','card_type'],['team','team'],['nationality','nationality']].forEach(function(k){ (D.lists[k[1]]||[]).forEach(function(x){ if(x.logo) LOGO[k[0]][String(x.id)]=x.logo; }); }); }
+  return (LOGO[kind]||{})[String(id)]||'';
+}
+function reqChip(r){
+  var lg=logoOf(r.kind,(r.ids||[])[0]);
+  return '<span class="rq">'+(lg?'<img src="'+esc(D.meta.img_base+lg)+'" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">':'')+esc(r.name)+'</span>';
+}
+function reqSlot(sl){return sl.map(reqChip).join('<span class="amp">&</span>');}
+function comboHtml(c){return c.slots.map(reqSlot).join('<span class="plus">+</span>');}
 function plHtml(p,top,boost){
   return '<button class="pl" data-card="'+key(p)+'" aria-label="Details zu '+esc(nice(p.n))+'"><div class="img"><div class="ovr">'+p.ovr+'</div>'+img(p)+(boost?'<span class="boost">+'+boost+'</span>':'')+'</div>'+
     '<div class="n">'+esc(nice(p.n))+'</div><div class="v">'+esc(top)+' · '+money(p.sal||0)+'</div></button>';
@@ -737,7 +768,7 @@ function lineHtml(title,l,isD){
   var ps=isD?HUT.sidesD(l.players,S.dHand):l.players;
   return '<div class="line"><div class="linehead"><strong>'+title+'</strong><div class="pills">'+pillsFor(l.boosts)+'</div></div>'+
     '<div class="players">'+ps.map(function(p,j){return plHtml(p,isD?(j?'RV':'LV')+' · '+(p.hand==='L'?'Links':'Rechts'):p.pos,l.boosts.overall);}).join('')+'</div>'+
-    l.active.map(function(c){return '<div class="combo">'+(c.src==='Coach'?'Coach: ':'')+c.slots.map(function(s){return esc(slotText(s));}).join(' + ')+' → '+boostLabel(c)+'</div>';}).join('')+
+    l.active.map(function(c){return '<div class="combo">'+(c.src==='Coach'?'Coach: ':'')+comboHtml(c)+' <b>'+boostLabel(c)+'</b></div>';}).join('')+
     '</div>';
 }
 var ARW='<svg viewBox="0 0 12 16" aria-hidden="true"><path d="M6 1l5 6H1z" fill="currentColor"/><path d="M6 8l5 6H1z" fill="currentColor" opacity=".55"/></svg>';
@@ -817,7 +848,8 @@ function reqHtml(r){
       '<p>'+cst.need+' Spieler aus '+(dn||'den Zielteams')+', Captain spielt mit</p>'+
       mini(cps)+'<div class="need">'+Object.keys(teams).filter(function(t){return teamName[t];}).sort(function(a,b){return (inL[b]||0)-(inL[a]||0);}).map(function(t){
         var ab=(D.lists.team.filter(function(x){return String(x.id)===String(t);})[0]||{}).abbr||teamName[t];
-        return '<span class="k'+(inL[t]?' hit':'')+'">'+esc(ab)+(inL[t]?' ×'+inL[t]:'')+'</span>';}).join('')+'</div></div>'+
+        var lg=logoOf('team',t);
+        return '<span class="k'+(inL[t]?' hit':'')+'">'+(lg?'<img src="'+esc(D.meta.img_base+lg)+'" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">':'')+esc(ab)+(inL[t]?' ×'+inL[t]:'')+'</span>';}).join('')+'</div></div>'+
       '<span class="st '+(cst.active?'ok':'no')+'">'+cst.count+' / '+cst.need+'</span></div>';
   }
   if(S.coach){
@@ -832,11 +864,10 @@ function reqHtml(r){
       Object.keys(groups).forEach(function(k){
         var g=groups[k], lines=g.line==='forwards'?r.forwards:r.defense, hit=0, hp=[];
         lines.forEach(function(l){ if(HUT.comboMatches(g.combos[0],l.players)){ hit++; hp=hp.concat(l.players); } });
-        var need=g.slots.map(function(sl){return sl.map(function(x){return x.name;}).join(' & ');});
-        var cnt={}; need.forEach(function(n){cnt[n]=(cnt[n]||0)+1;});
-        var txt=Object.keys(cnt).map(function(n){return cnt[n]+'× '+n;}).join(' + ');
+        var cnt={}, first={}; g.slots.forEach(function(sl){var n=slotText(sl); cnt[n]=(cnt[n]||0)+1; first[n]=sl;});
+        var txt=Object.keys(cnt).map(function(n){return cnt[n]+'× '+reqSlot(first[n]);}).join(' + ');
         h+='<div class="req"><div class="ic"><svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:var(--blue);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1-4 3.6-6 7-6s6 2 7 6"/><path d="M15.5 4.5l3-1.5"/></svg></div>'+
-          '<div><b>'+(g.line==='forwards'?'Sturm':'Abwehr')+': '+esc(txt)+'</b><div class="rw">'+rewardPills(g.combos)+'</div>'+mini(hp)+'</div>'+
+          '<div><b>'+(g.line==='forwards'?'Sturm':'Abwehr')+':</b> '+txt+'<div class="rw">'+rewardPills(g.combos)+'</div>'+mini(hp)+'</div>'+
           '<span class="st '+(hit?'ok':'no')+'">'+(hit?hit+'× aktiv':'nicht aktiv')+'</span></div>';
       });
     }
@@ -932,14 +963,15 @@ function stHtml(r){
 }
 function nmHtml(r){
   var ms=HUT.nearMisses(D,r,opts(),8);
-  if(!ms.length) return '<p class="small mute">Keine Reihe ist nur eine Karte von einem weiteren Combo entfernt.</p>';
-  return ms.map(function(m){
-    var fl=HUT.fillers(D,m,r,3);
-    return '<div class="line" style="margin-bottom:6px"><div class="linehead"><strong>'+m.where+'</strong><span class="pill '+(m.combo.type==='overall'?'o':m.combo.type==='ability_points'?'a':'s')+'">'+boostLabel(m.combo)+'</span></div>'+
-      '<div class="small">Es fehlt <b>'+esc(slotText(m.slot))+'</b> anstelle von '+esc(m.replace.n)+' ('+m.replace.ovr+' '+esc(m.replace.pos)+').</div>'+
-      '<div class="combo">Combo: '+m.combo.slots.map(function(s){return esc(slotText(s));}).join(' + ')+'</div>'+
-      (fl.length?'<div class="chips">'+fl.map(function(f){return '<button class="chip" data-card="'+key(f.card)+'">'+f.card.ovr+' '+esc(nice(f.card.n))+(f.owned?' ✓':'')+'</button>';}).join('')+'</div>':'')+'</div>';
-  }).join('')+'<p class="small mute">✓ heißt: Die Karte hast du schon. Der Optimierer hat sie nicht gesetzt, weil die Reihe damit insgesamt nicht stärker wird.</p>';
+  if(!ms.length) return '<p class="small mute">Gerade fehlt keiner Reihe genau eine Karte für einen weiteren Bonus.</p>';
+  return '<p class="small mute" style="margin-top:0">Diesen Reihen fehlt genau <b>eine</b> passende Karte für einen weiteren Bonus. Links der Spieler, der raus müsste, rechts Karten, die passen würden.</p>'+ms.map(function(m){
+    var fl=HUT.fillers(D,m,r,4);
+    return '<div class="nm"><div class="nmh"><strong>'+m.where+'</strong><span class="pill '+(m.combo.type==='overall'?'o':m.combo.type==='ability_points'?'a':'s')+'">'+boostLabel(m.combo)+'</span></div>'+
+      '<div class="combo">'+comboHtml(m.combo)+'</div>'+
+      '<div class="nmrow"><div class="nmout">'+mini([m.replace])+'<span>raus</span></div><div class="nmarr">→</div><div class="nmin"><div class="small">Gesucht: '+reqSlot(m.slot)+'</div>'+
+      (fl.length?'<div class="mini">'+fl.map(function(f){return '<button class="mc'+(f.owned?' own':'')+'" data-card="'+key(f.card)+'" aria-label="'+esc(nice(f.card.n))+' '+f.card.ovr+'">'+img(f.card)+'<i>'+f.card.ovr+'</i></button>';}).join('')+'</div>':'<div class="small mute">Keine passende Karte gefunden.</div>')+
+      '</div></div></div>';
+  }).join('')+'<p class="small mute">Grüner Rahmen = Karte hast du schon. Der Optimierer hat sie nicht gesetzt, weil die Reihe damit insgesamt schwächer wäre.</p>';
 }
 function captainHtml(t){
   var c=t.captain; if(!c) return '';
@@ -979,16 +1011,11 @@ function viewReihen(){
   var inLine={}; HUT.lineupPlayers(r).forEach(function(p){inLine[key(p)]=1;});
   var bench=o.filter(function(c){return !inLine[key(c)];}).sort(function(a,b){return b.ovr-a.ovr;});
   if(bench.length) h+='<h2>Nicht aufgestellt ('+bench.length+')</h2><p class="small mute">'+bench.map(function(c){return esc(nice(c.n))+' '+c.ovr+' '+esc(c.pos)+(!SHARED&&V.bans[key(c)]?' (gesperrt)':'');}).join(' · ')+'</p>';
-  h+='<details id="d-ap"'+(UI.dAp?' open':'')+'><summary>Ability Points planen</summary><div>'+apHtml(r)+'</div></details>';
+  h+='<details id="d-ap"'+(UI.dAp?' open':'')+'><summary>X-Factors &amp; Ability Points</summary><div>'+apHtml(r)+'</div></details>';
   if(!saved){
-    h+='<details id="d-nm"'+(UI.dNm?' open':'')+'><summary>Fast-Combos</summary><div id="nm-body">'+(UI.dNm?nmHtml(r):'')+'</div></details>';
+    h+='<details id="d-nm"'+(UI.dNm?' open':'')+'><summary>Fehlt nur eine Karte</summary><div id="nm-body">'+(UI.dNm?nmHtml(r):'')+'</div></details>';
   }
   h+='<details id="d-st"'+(UI.dSt?' open':'')+'><summary>Powerplay und Unterzahl</summary><div>'+stHtml(r)+'</div></details>';
-  if(!SHARED){
-    h+='<h2>Gemerkte Aufstellungen</h2>';
-    if(!saved) h+='<div class="two" style="grid-template-columns:1fr auto;margin-bottom:8px"><input type="text" id="sv-name" placeholder="Name, z. B. Cap-Team" aria-label="Name der Aufstellung" maxlength="30"><button class="btn sm" id="sv-save">Merken</button></div>';
-    h+=V.lineups.length?'<div class="list">'+V.lineups.map(function(l,i){return '<div class="row"><div class="rowhead" style="grid-template-columns:1fr auto auto"><button class="open" data-sv="'+i+'"><div class="nm">'+esc(l.name)+'</div><div class="sub">'+esc(l.info||'')+'</div></button><button class="btn ghost sm" data-sv="'+i+'">Ansehen</button><button class="act del" data-svdel="'+i+'" aria-label="'+esc(l.name)+' löschen">×</button></div></div>';}).join('')+'</div>':'<p class="small mute">Noch keine. Merk dir die aktuelle Aufstellung, um sie später mit einer anderen zu vergleichen.</p>';
-  }
   h+='<p class="small mute" style="margin-top:16px">Priorität: '+esc(w.label)+'. '+(S.coach?'Coach: '+esc(S.coach)+'.':'Kein Coach gewählt.')+(S.useRating?' Eigene Bewertung aktiv.':'')+' Ändern unter Setup.</p>';
   view.innerHTML=h;
 }
@@ -1059,20 +1086,26 @@ function viewAnalyse(){
 function viewSetup(){
   var m=D.meta, h='';
   var caps=(D.captains||[]).map(function(c){return byKey[c.k+c.id];}).filter(function(c){return c&&isOwned(c);});
-  h+='<h2>Regeln für den Optimierer</h2>'+
-   '<div class="field"><label for="s-cap">Salary Cap in Mio. $</label><input id="s-cap" type="number" inputmode="decimal" min="0" step="0.5" placeholder="leer = ohne Cap rechnen" value="'+esc(S.cap)+'"><small>Dein Basis-Cap aus dem Spiel, ohne Chemistry-Boni. Die Boni rechnet die App dazu.</small></div>'+
-   '<div class="field"><label for="s-ap">Ability Points ohne Boni</label><input id="s-ap" type="number" inputmode="numeric" min="0" step="1" placeholder="optional" value="'+esc(S.ap)+'"></div>'+
-   '<div class="field"><label for="s-coach">Coach</label><select id="s-coach"><option value="">Kein Coach</option>'+D.coaches.map(function(c){return opt(c.name,c.name+' ('+(c.meta[0]||'')+')',S.coach);}).join('')+'</select><small>Jeder Coach bringt eigene Reihen-Combos für sein Team mit.</small></div>'+
-   '<div class="field"><label for="s-captain">Captain</label><select id="s-captain">'+opt('auto','Automatisch wählen',S.captain)+opt('','Ohne Captain rechnen',S.captain)+caps.map(function(c){return opt(key(c),c.n+' ('+c.ovr+' '+c.ctn+')',S.captain);}).join('')+'</select><small>'+(D.captains&&D.captains.length?D.captains.length+' Captain-Karten geben einen Bonus, wenn genug Spieler aus ihren Zielteams aufgestellt sind. Du hast '+caps.length+' davon.':'In den Daten sind keine Captain-Karten.')+'</small></div>'+
-   '<div class="field"><label for="s-prio">Priorität</label><select id="s-prio">'+Object.keys(PRIO).map(function(k){return opt(k,PRIO[k].label,S.prio);}).join('')+'</select></div>'+
-   '<label class="check"><input type="checkbox" id="s-strict"'+(S.strict?' checked':'')+'> Feste Positionen (LW, C, RW und LD, RD)</label>'+
-   '<div class="field"><label for="s-dhand">Verteidiger-Seiten</label><select id="s-dhand">'+opt('','Nach Kartenposition (LD links, RD rechts)',S.dHand)+opt('off','Gegenseite für One-Timer (Linksschütze rechts)',S.dHand)+opt('on','Eigene Seite (Linksschütze links)',S.dHand)+'</select><small>Mit einer Seiten-Einstellung verteilt die App die Verteidiger nach Schusshand statt nach Kartenposition und bevorzugt Paare aus einem Links- und einem Rechtsschützen.</small></div>'+
-   '<h2>Eigene Bewertung</h2><label class="check"><input type="checkbox" id="s-rate"'+(S.useRating?' checked':'')+'> Spieler nach meinen Gewichten bewerten statt nach OVR</label>';
-  if(S.useRating) h+='<div class="statgrid" style="margin-bottom:12px">'+Object.keys(GRP).map(function(g){return '<label for="w-'+g+'">'+GRP[g].toUpperCase()+'<select id="w-'+g+'" data-w="'+g+'">'+[[0,'egal'],[1,'normal'],[2,'wichtig'],[3,'sehr wichtig']].map(function(o){return opt(o[0],o[1],S.weights[g]);}).join('')+'</select></label>';}).join('')+'</div><p class="small mute">Der Optimierer und der Upgrade-Finder nutzen dann diesen Wert. Goalies bleiben bei OVR.</p>';
-  h+='<p class="note">So rechnet die App: Ein Combo greift, wenn jede Anforderung von einem anderen Spieler der Reihe erfüllt wird. Alle passenden Combos einer Reihe zählen zusammen, +OVR gilt für jeden Spieler der Reihe. Kein Spieler steht doppelt in der Aufstellung.</p>'+
-   '<h2>App installieren</h2>'+installHtml()+
-   '<h2>Spiel</h2>'+(VERSIONS&&VERSIONS.versions.length>1?'<div class="field"><label for="s-game">NHL-Version</label><select id="s-game">'+VERSIONS.versions.map(function(x){var n=(VD[String(x.version)]&&VD[String(x.version)].owned||[]).length; return opt(String(x.version),x.game+(x.version===VERSIONS.default?' (aktuell)':'')+(n?' · '+n+' Karten im Kader':''),VER);}).join('')+'</select><small>Jede Version hat ihre eigenen Karten und ihren eigenen Kader. Beim Wechsel lädt die App die Daten neu.</small></div>':'<p class="small mute">Eingestellt ist '+esc(m.game||'')+'.</p>')+newerHtml(true)+
-   '<h2>Daten</h2><p class="small mute">'+m.skaters.toLocaleString('de-DE')+' Feldspieler, '+m.goalies+' Goalies, '+m.combos+' Chemistry Combos, '+m.coaches+' Coaches, '+(m.xfactors||0)+' X-Factors.<br>Stand '+new Date(m.updated).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'})+' Uhr. Quelle: <a href="'+esc(m.img_base||'https://nhlhutbuilder.com/')+'">NHL HUT Builder</a>.</p>';
+  var co=(D.coaches||[]).filter(function(c){return c.name===S.coach;})[0], capC=S.captain&&S.captain!=='auto'?byKey[S.captain]:null, w=PRIO[S.prio]||PRIO.bal;
+  var grp=function(id,title,sum,body){ return '<details class="sg" data-sg="'+id+'"'+(UI.sg&&UI.sg[id]?' open':'')+'><summary><span><b>'+title+'</b><small>'+sum+'</small></span></summary><div>'+body+'</div></details>'; };
+  h+=grp('team','Coach &amp; Captain',esc(S.coach||'Kein Coach')+' · '+(S.captain==='auto'?'Captain automatisch':S.captain===''?'ohne Captain':esc(capC?nice(capC.n):'Captain')),
+     '<div class="field"><label for="s-coach">Coach</label><select id="s-coach"><option value="">Kein Coach</option>'+D.coaches.map(function(c){return opt(c.name,c.name+' ('+(c.meta[0]||'')+')',S.coach);}).join('')+'</select></div>'+
+     '<div class="field"><label for="s-captain">Captain</label><select id="s-captain">'+opt('auto','Automatisch wählen',S.captain)+opt('','Ohne Captain rechnen',S.captain)+caps.map(function(c){return opt(key(c),c.n+' ('+c.ovr+' '+c.ctn+')',S.captain);}).join('')+'</select><small>Du hast '+caps.length+' von '+((D.captains||[]).length)+' Captain-Karten.</small></div>');
+  h+=grp('budget','Cap &amp; Ability Points',(S.cap?'Cap '+money(parseFloat(S.cap)):'ohne Cap')+' · '+(S.ap?S.ap+' AP':'AP nicht gesetzt'),
+     '<div class="two"><div class="field"><label for="s-cap">Salary Cap (Mio. $)</label><input id="s-cap" type="number" inputmode="decimal" min="0" step="0.5" placeholder="ohne Cap" value="'+esc(S.cap)+'"></div>'+
+     '<div class="field"><label for="s-ap">Basis-AP</label><input id="s-ap" type="number" inputmode="numeric" min="0" step="1" placeholder="optional" value="'+esc(S.ap)+'"></div></div><small class="mute small">Werte ohne Chemistry-Boni, die rechnet die App dazu.</small>');
+  h+=grp('lines','Aufstellung',esc(w.label)+' · '+(S.strict?'feste Positionen':'Positionen frei')+(S.dHand?' · Verteidiger nach Schusshand':''),
+     '<div class="field"><label for="s-prio">Priorität</label><select id="s-prio">'+Object.keys(PRIO).map(function(k){return opt(k,PRIO[k].label,S.prio);}).join('')+'</select></div>'+
+     '<label class="check"><input type="checkbox" id="s-strict"'+(S.strict?' checked':'')+'> Feste Positionen (LW, C, RW und LD, RD)</label>'+
+     '<div class="field" style="margin-top:12px"><label for="s-dhand">Verteidiger-Seiten</label><select id="s-dhand">'+opt('','Nach Kartenposition',S.dHand)+opt('off','Gegenseite für One-Timer',S.dHand)+opt('on','Eigene Schussseite',S.dHand)+'</select></div>');
+  var rb='<label class="check"><input type="checkbox" id="s-rate"'+(S.useRating?' checked':'')+'> Spieler nach meinen Gewichten bewerten statt nach OVR</label>';
+  if(S.useRating) rb+='<div class="statgrid" style="margin:10px 0">'+Object.keys(GRP).map(function(g){return '<label for="w-'+g+'">'+GRP[g].toUpperCase()+'<select id="w-'+g+'" data-w="'+g+'">'+[[0,'egal'],[1,'normal'],[2,'wichtig'],[3,'sehr wichtig']].map(function(o){return opt(o[0],o[1],S.weights[g]);}).join('')+'</select></label>';}).join('')+'</div><p class="small mute">Goalies bleiben bei OVR.</p>';
+  h+=grp('rate','Eigene Bewertung',S.useRating?'an':'aus, es zählt OVR',rb);
+  h+=grp('app','App &amp; Daten',esc(m.game||'')+' · Stand '+new Date(m.updated).toLocaleDateString('de-DE'),
+     (VERSIONS&&VERSIONS.versions.length>1?'<div class="field"><label for="s-game">NHL-Version</label><select id="s-game">'+VERSIONS.versions.map(function(x){var n=(VD[String(x.version)]&&VD[String(x.version)].owned||[]).length; return opt(String(x.version),x.game+(n?' · '+n+' Karten':''),VER);}).join('')+'</select></div>':'')+newerHtml(true)+
+     '<div class="lab" style="margin-bottom:6px">App installieren</div>'+installHtml()+
+     '<p class="small mute">'+m.skaters.toLocaleString('de-DE')+' Feldspieler, '+m.goalies+' Goalies, '+m.combos+' Combos, '+m.coaches+' Coaches, '+(m.xfactors||0)+' X-Factors. Stand '+new Date(m.updated).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'})+' Uhr. Quelle: <a href="'+esc(m.img_base||'https://nhlhutbuilder.com/')+'">NHL HUT Builder</a>.</p>'+
+     '<p class="small mute">So rechnet die App: Ein Combo greift, wenn jede Anforderung von einem anderen Spieler der Reihe erfüllt wird. Alle Combos einer Reihe zählen zusammen, +OVR gilt für jeden Spieler der Reihe.</p>');
   view.innerHTML=h;
 }
 function newerHtml(always){
@@ -1383,6 +1416,7 @@ view.addEventListener('input',function(e){
   else if(t.id==='s-ap'){S.ap=t.value; save();}
 });
 view.addEventListener('change',function(e){
+  if(tab()==='setup'&&e.target.id&&/^s-(coach|captain|prio|strict|dhand|cap|ap)$/.test(e.target.id)) setTimeout(function(){ if(tab()==='setup') viewSetup(); },0);
   var t=e.target, d=t.dataset;
   if(t.id==='f-type'){UI.type=t.value; UI.limit=40; results();}
   else if(t.id==='f-min'){UI.min=t.value; UI.limit=40; results();}
@@ -1406,7 +1440,7 @@ view.addEventListener('change',function(e){
   else if(d.impsel!==undefined){UI.imp.found[+d.impsel].sel=t.value; UI.imp.found[+d.impsel].on=!isOwned(byKey[t.value]); UI.imp.found[+d.impsel].sure=true; viewImport();}
 });
 view.addEventListener('toggle',function(e){
-  var t=e.target; if(!t.id) return;
+  var t=e.target; if(t.dataset&&t.dataset.sg){ UI.sg=UI.sg||{}; UI.sg[t.dataset.sg]=t.open; return; } if(!t.id) return;
   if(t.id==='d-ap') UI.dAp=t.open; else if(t.id==='d-st') UI.dSt=t.open;
   else if(t.id==='d-nm'){UI.dNm=t.open; var el=document.getElementById('nm-body'); if(t.open&&el&&!el.innerHTML) el.innerHTML=nmHtml(result());}
 },true);
@@ -1426,7 +1460,7 @@ function loadData(){
   });
 }
 loadData().then(function(d){
-  D=d; D.xf=D.xf||{}; D.captains=D.captains||[];
+  D=d; LOGO=null; D.xf=D.xf||{}; D.captains=D.captains||[];
   VER=String(d.meta.version||((d.meta.img_base||'').match(/NHL(\d+)/)||[])[1]||'');
   var v=VD[VER]||{};
   V={owned:(v.owned||[]).slice(),locks:v.locks||{},bans:v.bans||{},lineups:v.lineups||[],xfOn:v.xfOn||{}};
