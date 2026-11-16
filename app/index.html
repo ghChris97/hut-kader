@@ -402,13 +402,13 @@ details>summary{font:700 15px/1.2 var(--display);letter-spacing:.1em;text-transf
 (function(){
 'use strict';
 var D=null, byKey={}, byName={}, teamName={}, typeName={};
-var S={cap:'', ap:'', coach:'', strict:true, dHand:'', game:'', prio:'bal', seenNewer:0, captain:'auto', useRating:false,
+var S={cap:'', ap:'', coach:'', strict:true, dHand:'', game:'', upMax:'', upTol:'3', prio:'bal', seenNewer:0, captain:'auto', useRating:false,
        weights:{skating:1,shooting:1,hands:1,checking:1,defense:1}, lastSeen:'', prevSeen:''};
 var VERSIONS=null; var VD={}, VER='', V={owned:[],locks:{},bans:{},lineups:[],xfOn:{}};  /* Daten je NHL-Version */
 var SHARED=null;   /* geteilter Kader aus einem Link: nur ansehen */
 var RES=null;      /* letzte Optimierung, wird bei jeder Aenderung verworfen */
 var UI={q:'', pos:'', type:'', min:'', sort:'ovr', limit:40, open:null, stat:{}, xf:'', hgt:'', hand:'', onlyNew:false, onlyMine:false,
-        more:false, cmp:[], saved:-1, up:null, upMin:'', upMode:'bonus', upMax:'84', upTol:'3', imp:null};
+        more:false, cmp:[], saved:-1, up:null, upMin:'', upMode:'bonus', upMax:'', upTol:'3', imp:null};
 var PRIO={bal:{ovr:1,ap:0.5,sal:0.25,label:'Ausgewogen'}, ovr:{ovr:1,ap:0.05,sal:0.02,label:'Stärkste Reihen'},
           ap:{ovr:1,ap:2,sal:0.25,label:'Möglichst viele Ability Points'}, sal:{ovr:1,ap:0.5,sal:1.5,label:'Möglichst viel Cap-Bonus'}};
 var SA=['ACC','AGI','BAL','END','SPD','SSA','SSP','WSA','WSP','DEK','OAW','HAE','PAS','PC','CHK','STR','AGR','DUR','FS','DAW','BLK','SCH','FO','DIS'];
@@ -1268,8 +1268,8 @@ view.addEventListener('change',function(e){
   else if(t.id==='f-hgt'){UI.hgt=t.value; UI.limit=40; results();}
   else if(t.id==='f-hand'){UI.hand=t.value; UI.limit=40; results();}
   else if(t.id==='up-min'){UI.upMin=t.value; UI.up=null;}
-  else if(t.id==='up-max'){UI.upMax=t.value; UI.up=null;}
-  else if(t.id==='up-tol'){UI.upTol=t.value; UI.up=null;}
+  else if(t.id==='up-max'){UI.upMax=S.upMax=t.value; UI.up=null; save();}
+  else if(t.id==='up-tol'){UI.upTol=S.upTol=t.value; UI.up=null; save();}
   else if(t.id==='s-coach'){S.coach=t.value; UI.up=null; save();}
   else if(t.id==='s-captain'){S.captain=t.value; save();}
   else if(t.id==='s-prio'){S.prio=t.value; UI.up=null; save();}
@@ -1291,7 +1291,7 @@ document.getElementById('file-shot').addEventListener('change',function(){runImp
 document.getElementById('file-cam').addEventListener('change',function(){runImport(this.files); this.value='';});
 window.addEventListener('hashchange',function(){ if(CARD){CARD=null; sheet.classList.remove('on'); document.body.classList.remove('sheet-open');} UI.saved=-1; if(tab()!=='kader'&&UI.imp&&UI.imp.step!=='scan') UI.imp=null; render(); view.scrollTop=0;});
 
-load(); render();
+load(); UI.upMax=S.upMax||''; UI.upTol=S.upTol||'3'; render();
 function loadData(){
   var urlGame=new URLSearchParams(location.search).get('g');
   return fetch('versions.json?v=__BUILD__').then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}).then(function(vs){
