@@ -669,7 +669,6 @@ function viewKader(){
     var list=o.filter(function(c){return g[1].indexOf(c.pos)>=0;}).sort(function(a,b){return g[1].indexOf(a.pos)-g[1].indexOf(b.pos)||b.ovr-a.ovr;});
     h+='<h2>'+g[0]+' <span class="count">'+list.length+'</span></h2>'+(list.length?'<div class="players kgrid">'+list.map(kTile).join('')+'</div>':'<p class="mute small">Noch keine Karte.</p>');
   });
-  if(!SHARED) h+='<p style="margin-top:24px" class="btns"><button class="btn ghost sm" id="clear">Kader leeren</button> <span id="clear-ask"></span></p>';
   view.innerHTML=h;
 }
 
@@ -1225,6 +1224,11 @@ function render(){
     view.innerHTML='<div class="center"><h2>Diese Ansicht konnte nicht geladen werden</h2><p class="mute">'+esc(err&&err.message)+'</p><button class="btn" id="hard-reload">App neu laden</button></div>';
   }
 }
+function isOwnedKey(k){return V.owned.indexOf(k)>=0;}
+function askRemove(k){
+  var c=byKey[k];
+  return window.confirm((c?nice(c.n)+' ('+c.ovr+', '+c.pos+')':'Diese Karte')+' wirklich aus dem Kader entfernen?');
+}
 function toggle(k){
   if(SHARED){toast('Geteilter Kader: nur ansehen'); return false;}
   var i=V.owned.indexOf(k);
@@ -1242,8 +1246,8 @@ document.addEventListener('click',function(e){
   if(!(view.contains(b)||sheet.contains(b))) return;
   var d=b.dataset;
   if(d.close){closeCard(); return;}
-  if(d.tg){ if(toggle(d.tg)){ if(tab()==='karten') results(); else render(); refreshSheet(); } return; }
-  if(d.rm){toggle(d.rm); render(); return;}
+  if(d.tg){ if(!SHARED&&isOwnedKey(d.tg)&&!askRemove(d.tg)) return; if(toggle(d.tg)){ if(tab()==='karten') results(); else render(); refreshSheet(); } return; }
+  if(d.rm){ if(!askRemove(d.rm)) return; toggle(d.rm); render(); return;}
   if(d.cmp){
     if(UI.cmp.indexOf(d.cmp)<0){ if(UI.cmp.length>=2) UI.cmp.shift(); UI.cmp.push(d.cmp); }
     if(UI.cmp.length===2){closeCard(); setTimeout(function(){location.hash='#analyse';},50);} else toast('Gemerkt. Jetzt die zweite Karte öffnen.');
