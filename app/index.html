@@ -375,6 +375,16 @@ nav .badge{background:var(--accent);color:#0c1218}
 .note{border-radius:2px;border-left-color:var(--accent);background:rgba(14,19,26,.6)}
 .note.warn{border-left-color:#ff6b5e} .note.ok{border-left-color:#9be38d} .note.ap{border-left-color:#b9c2ff}
 .seg{background:rgba(14,19,26,.6)}
+.rstat{display:flex;gap:6px;margin:0 0 10px;overflow-x:auto;scrollbar-width:none}
+.rstat>div{flex:1 0 auto;background:rgba(14,19,26,.6);border:1px solid var(--line);padding:6px 9px;display:flex;flex-direction:column;align-items:flex-start;min-width:0}
+.rstat b{font:700 18px/1.05 var(--display);letter-spacing:.02em;white-space:nowrap}
+.rstat span{font-size:10.5px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.rstat .o b{color:var(--ovr)} .rstat .a b{color:var(--ap)} .rstat .s b{color:var(--sal)} .rstat .bad b{color:#ff6b62}
+.rtop{display:flex;gap:8px;align-items:stretch;margin-bottom:10px}
+.rtop .seg{flex:1;margin:0}
+.rtop .seg button{padding:6px 6px;font-size:12.5px}
+.rtop .icon{padding:0 12px}
+.rtop .icon svg{width:20px;height:20px;margin:0}
 .seg button{border-radius:2px;font:700 14px/1.2 var(--display);letter-spacing:.1em;text-transform:uppercase}
 .seg button[aria-pressed="true"]{background:#fff;color:#141a22}
 details>summary{font:700 15px/1.2 var(--display);letter-spacing:.1em;text-transform:uppercase}
@@ -770,7 +780,7 @@ function overviewHtml(r){
     }
   }
   var req=reqHtml(r); CAPTEAMS=null;
-  return '<div class="gm-tools"><button class="btn ghost sm" id="gm-full"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>Vollbild</button></div>'+h+'</div></div>'+
+  return h+'</div></div>'+
     '<p class="legend">GES = Gesamtwertung, M$ = Cap-Bonus, FP = Fähigkeitspunkte · Stern = zählt für den Captain · Karte antippen für Details</p>'+req;
 }
 function rewardPills(list){
@@ -928,23 +938,27 @@ function viewReihen(){
   var r=saved?HUT.evaluate(D,saved,opts(),byKey):result(), t=r.totals;
   var used=t.sal, capEff=cap?cap+t.salBoost:0, h=sharedHtml();
   if(saved) h+='<p class="note">Gemerkte Aufstellung <b>'+esc(saved.name)+'</b>, mit den heutigen Kartenwerten bewertet. <button class="chip" id="sv-back">Zur optimierten Aufstellung</button></p>';
-  h+='<div class="tiles">'+
-    '<div class="tile o"><b>'+(t.n?t.avg.toFixed(1):'–')+'</b><span>Ø Overall mit Boni</span></div>'+
-    '<div class="tile a"><b>'+(apBase?(apBase+t.ap):'+'+t.ap)+'</b><span>Ability Points'+(apBase?' ('+apBase+' + '+t.ap+' Bonus)':' Bonus')+'</span></div>'+
-    '<div class="tile s'+(cap&&used>capEff+1e-9?' bad':'')+'"><b>'+money(used)+'</b><span>Gehalt'+(cap?' von '+money(capEff)+' ('+money(cap)+' + '+money(t.salBoost)+')':' · Cap-Bonus +'+money(t.salBoost))+'</span></div>'+
-    '<div class="tile o"><b>+'+t.boostOvr+'</b><span>OVR-Boni über alle Reihen</span></div></div>';
-  if(r.capFailed) h+='<p class="note warn">Mit diesem Kader bleibt keine vollständige Aufstellung unter dem Cap. Angezeigt wird die stärkste Aufstellung ohne Cap.</p>';
-  else if(r.capAdjusted) h+='<p class="note">Die stärkste Aufstellung lag über dem Cap. Diese hier ist die beste, die hineinpasst.</p>';
-  h+=captainHtml(t);
+  var over=cap&&used>capEff+1e-9, capt=t.captain;
+  h+='<div class="rstat">'+
+    '<div class="o"><b>'+(t.n?t.avg.toFixed(1):'–')+'</b><span>Ø OVR</span></div>'+
+    '<div class="a"><b>'+(apBase?(apBase+t.ap):'+'+t.ap)+'</b><span>AP</span></div>'+
+    '<div class="s'+(over?' bad':'')+'"><b>'+money(used)+'</b><span>'+(cap?'von '+money(capEff):'Gehalt')+'</span></div>'+
+    '<div class="o"><b>+'+t.boostOvr+'</b><span>OVR-Boni</span></div>'+
+    (capt?'<div class="'+(capt.active?'a':'bad')+'"><b>C '+capt.count+'/'+capt.need+'</b><span>'+(capt.active?'aktiv':'aus')+'</span></div>':'')+
+    '</div>';
   var miss=[]; if(r.missing.f) miss.push(r.missing.f+' Sturmreihe'+(r.missing.f>1?'n':'')); if(r.missing.d) miss.push(r.missing.d+' Abwehrpaar'+(r.missing.d>1?'e':'')); if(r.missing.g) miss.push(r.missing.g+' Goalie'+(r.missing.g>1?'s':''));
-  if(miss.length) h+='<p class="note warn">Für eine komplette Aufstellung fehlen noch: '+miss.join(', ')+'.'+(S.strict?' Feste Positionen sind an (Setup).':'')+'</p>';
-  h+='<div class="seg" role="group" aria-label="Ansicht"><button id="rv-ov" aria-pressed="'+(UI.rv!=='det')+'">Übersicht</button><button id="rv-det" aria-pressed="'+(UI.rv==='det')+'">Reihen im Detail</button></div>';
+  h+='<div class="rtop"><div class="seg" role="group" aria-label="Ansicht"><button id="rv-ov" aria-pressed="'+(UI.rv!=='det')+'">Übersicht</button><button id="rv-det" aria-pressed="'+(UI.rv==='det')+'">Detail</button></div>'+
+    (UI.rv!=='det'?'<button class="btn ghost sm icon" id="gm-full" aria-label="Vollbild"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>':'')+'</div>';
   if(UI.rv!=='det'){ h+=overviewHtml(r); }
   else{
   if(r.forwards.length){h+='<h2>Sturm</h2><div class="list">'+r.forwards.map(function(l,i){return lineHtml((i+1)+'. Reihe',l);}).join('')+'</div>';}
   if(r.defense.length){h+='<h2>Abwehr</h2><div class="list">'+r.defense.map(function(l,i){return lineHtml((i+1)+'. Paar',l,true);}).join('')+'</div>';}
   if(r.goalies.length){h+='<h2>Tor</h2><div class="line"><div class="players">'+r.goalies.map(function(p,i){return plHtml(p,i?'Backup':'Starter');}).join('')+'</div></div>';}
   }
+  if(r.capFailed) h+='<p class="note warn">Mit diesem Kader bleibt keine vollständige Aufstellung unter dem Cap. Angezeigt wird die stärkste Aufstellung ohne Cap.</p>';
+  else if(r.capAdjusted) h+='<p class="note">Die stärkste Aufstellung lag über dem Cap. Diese hier ist die beste, die hineinpasst.</p>';
+  if(miss.length) h+='<p class="note warn">Für eine komplette Aufstellung fehlen noch: '+miss.join(', ')+'.'+(S.strict?' Feste Positionen sind an (Setup).':'')+'</p>';
+  h+=captainHtml(t);
   var inLine={}; HUT.lineupPlayers(r).forEach(function(p){inLine[key(p)]=1;});
   var bench=o.filter(function(c){return !inLine[key(c)];}).sort(function(a,b){return b.ovr-a.ovr;});
   if(bench.length) h+='<h2>Nicht aufgestellt ('+bench.length+')</h2><p class="small mute">'+bench.map(function(c){return esc(nice(c.n))+' '+c.ovr+' '+esc(c.pos)+(!SHARED&&V.bans[key(c)]?' (gesperrt)':'');}).join(' · ')+'</p>';
