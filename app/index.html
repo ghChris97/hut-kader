@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>HUT Kader</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: eine Spalte fuers Handy, feste Tab-Leiste unten, Listen als dichte Spielberichts-Zeilen. */
+:root{
+  color-scheme:dark;
+  --ink:#0d1b2a; --panel:#152a40; --panel2:#1b3550; --line:#27425d;
+  --ice:#eaf2f8; --mute:#93a8bd; --lamp:#ff5a4f;
+  --ovr:#f4c95d; --ap:#b79cff; --sal:#5fd3a2;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--ink);color:var(--ice);font:400 15px/1.4 var(--body);display:flex;flex-direction:column;-webkit-text-size-adjust:100%}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+header{padding:12px 16px 8px;display:flex;align-items:baseline;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line)}
+h1{font:700 22px/1 var(--display);letter-spacing:.04em;text-transform:uppercase;margin:0}
+h1 b{color:var(--lamp);font-weight:700}
+#stand{color:var(--mute);font-size:12px;text-align:right}
+main{flex:1;overflow-y:auto;padding:12px 16px 24px;-webkit-overflow-scrolling:touch}
+nav{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);background:var(--panel)}
+nav a{padding:10px 4px 12px;text-align:center;text-decoration:none;color:var(--mute);font:600 15px/1.1 var(--display);letter-spacing:.06em;text-transform:uppercase;border-top:3px solid transparent}
+nav a[aria-current="page"]{color:var(--ice);border-top-color:var(--lamp)}
+nav a span{display:block;font:500 11px/1.3 var(--body);letter-spacing:0;text-transform:none;color:var(--mute)}
+h2{font:600 18px/1.1 var(--display);letter-spacing:.05em;text-transform:uppercase;margin:18px 0 8px;text-wrap:balance}
+h2:first-child{margin-top:0}
+p{margin:0 0 10px}
+.mute{color:var(--mute)}
+.small{font-size:13px}
+.filters{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.filters input[type=search],.field input,.field select,.filters select{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-height:42px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font:600 14px/1 var(--display);letter-spacing:.05em}
+.chip[aria-pressed="true"]{background:var(--ice);color:var(--ink);border-color:var(--ice)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.list{display:flex;flex-direction:column;gap:6px}
+.row{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.row.own{border-color:var(--sal)}
+.rowhead{display:grid;grid-template-columns:54px 1fr auto;gap:10px;align-items:center;padding:8px}
+.art{position:relative;width:54px;aspect-ratio:804/1128;border-radius:5px;overflow:hidden;background:var(--ink);display:flex;align-items:center;justify-content:center}
+.art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.sub b{color:var(--ovr);font:700 16px/1 var(--display)}
+.big{display:block;width:min(200px,60%);aspect-ratio:804/1128;border-radius:8px;margin:0 auto;background:var(--ink)}
+.pl img{display:block;width:100%;aspect-ratio:804/1128;object-fit:cover;border-radius:6px;margin-bottom:6px;background:var(--panel)}
+.ovr{font:700 24px/1 var(--display);color:var(--ovr);text-align:center;font-variant-numeric:tabular-nums}
+.ovr small{display:block;font:600 11px/1.2 var(--display);color:var(--mute);letter-spacing:.06em}
+.open{background:none;border:0;padding:0;text-align:left;min-width:0}
+.nm{font:600 17px/1.15 var(--display);letter-spacing:.03em;overflow-wrap:anywhere}
+.sub{color:var(--mute);font-size:13px;font-variant-numeric:tabular-nums}
+.act{min-width:44px;min-height:44px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);font:700 20px/1 var(--display)}
+.act.on{background:var(--sal);border-color:var(--sal);color:var(--ink)}
+.act.del{color:var(--lamp)}
+.detail{border-top:1px solid var(--line);padding:10px;display:flex;flex-direction:column;gap:10px}
+.attrs{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:4px}
+.attr{background:var(--ink);border-radius:6px;padding:4px 6px;display:flex;justify-content:space-between;gap:6px;font-size:13px;font-variant-numeric:tabular-nums}
+.attr span{color:var(--mute);font:600 12px/1.6 var(--display);letter-spacing:.05em}
+.attr.hi b{color:var(--ovr)}
+.pill{display:inline-block;border-radius:999px;padding:2px 9px;font:600 13px/1.5 var(--display);letter-spacing:.04em;border:1px solid currentColor;white-space:nowrap}
+.pill.o{color:var(--ovr)} .pill.a{color:var(--ap)} .pill.s{color:var(--sal)} .pill.n{color:var(--mute)}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.btn{background:var(--lamp);color:#fff;border:0;border-radius:10px;padding:12px 16px;font:700 17px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;min-height:46px}
+.btn.ghost{background:none;border:1px solid var(--line);color:var(--ice)}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.tile b{display:block;font:700 28px/1 var(--display);font-variant-numeric:tabular-nums}
+.tile span{color:var(--mute);font-size:12px}
+.tile.o b{color:var(--ovr)} .tile.a b{color:var(--ap)} .tile.s b{color:var(--sal)} .tile.bad b{color:var(--lamp)}
+.line{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.linehead{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.linehead strong{font:600 16px/1 var(--display);letter-spacing:.06em;text-transform:uppercase}
+.players{display:grid;gap:6px}
+.players.n3{grid-template-columns:repeat(3,1fr)} .players.n2{grid-template-columns:repeat(3,1fr)}
+.pl{background:var(--ink);border-radius:8px;padding:6px 8px;min-width:0}
+.pl .p{color:var(--mute);font:600 12px/1.3 var(--display);letter-spacing:.06em}
+.pl .n{font:600 15px/1.15 var(--display);overflow-wrap:anywhere}
+.pl .v{font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums}
+.pl .v b{color:var(--ovr);font:700 15px/1 var(--display)}
+.combo{font-size:13px;color:var(--mute)}
+.note{border-left:3px solid var(--ovr);background:var(--panel);padding:10px 12px;border-radius:0 8px 8px 0;font-size:14px}
+.note .chip{margin-left:6px}
+.note.warn{border-left-color:var(--lamp)}
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.field label{font:600 14px/1.2 var(--display);letter-spacing:.05em;text-transform:uppercase}
+.field small{color:var(--mute)}
+.check{display:flex;gap:10px;align-items:center;margin-bottom:12px}
+.check input{width:22px;height:22px;accent-color:var(--lamp)}
+.center{text-align:center;padding:28px 8px;display:flex;flex-direction:column;gap:12px;align-items:center}
+a{color:var(--ice)}
+@media (min-width:720px){main{padding:16px max(16px,calc(50% - 360px)) 32px}header{padding-inline:max(16px,calc(50% - 360px))}}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<header>
+  <h1>HUT Kader <b id="game"></b></h1>
+  <div id="stand">Daten werden geladen</div>
+</header>
+<main id="view"><div class="center mute">Kartendaten werden geladen …</div></main>
+<nav aria-label="Bereiche">
+  <a href="#karten" data-tab="karten">Karten<span id="n-karten">&nbsp;</span></a>
+  <a href="#kader" data-tab="kader">Kader<span id="n-kader">0 Karten</span></a>
+  <a href="#reihen" data-tab="reihen">Reihen<span>Optimierer</span></a>
+  <a href="#setup" data-tab="setup">Setup<span>Cap, Coach</span></a>
+</nav>
+
+<script src="engine.js"></script>
+<script>
+(function(){
+'use strict';
+var D=null, byKey={}, byName={}, xfName={}, teamName={}, typeName={};
+var S={owned:[], cap:'', ap:'', coach:'', strict:true, prio:'bal', seenNewer:0};
+var ROSTERS={}, VER='';  /* ein Kader je NHL-Version, weil jede Version eigene Karten hat */
+var UI={q:'', pos:'', type:'', min:'', sort:'ovr', limit:40, open:null};
+var PRIO={bal:{ovr:1,ap:0.5,sal:0.25,label:'Ausgewogen'}, ovr:{ovr:1,ap:0.05,sal:0.02,label:'Stärkste Reihen (OVR)'},
+          ap:{ovr:1,ap:2,sal:0.25,label:'Möglichst viele Ability Points'}, sal:{ovr:1,ap:0.5,sal:1.5,label:'Möglichst viel Cap-Bonus'}};
+var SA=['ACC','AGI','BAL','END','SPD','SSA','SSP','WSA','WSP','DEK','OAW','HAE','PAS','PC','CHK','STR','AGR','DUR','FS','DAW','BLK','SCH','FO','DIS'];
+var GA=['GH','SH','GL','PK','SL','PAS','SPD','VIS','END','AGI','POS','5H','BRK','REC','AGR','RBC','DUR'];
+var view=document.getElementById('view');
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function key(c){return c.k+c.id;}
+function load(){
+  try{
+    var r=JSON.parse(localStorage.getItem('hutkader')||'null');
+    if(r){for(var k in S)if(k!=='owned'&&r[k]!==undefined)S[k]=r[k]; ROSTERS=r.rosters||{};}
+    else{ // Uebernahme aus der ersten Version der App
+      var o=JSON.parse(localStorage.getItem('hut27')||'null');
+      if(o){for(var j in S)if(j!=='owned'&&o[j]!==undefined)S[j]=o[j]; if(o.owned&&o.owned.length)ROSTERS['27']=o.owned;}
+    }
+  }catch(e){}
+}
+function save(){
+  if(VER) ROSTERS[VER]=S.owned;
+  try{localStorage.setItem('hutkader',JSON.stringify({cap:S.cap,ap:S.ap,coach:S.coach,strict:S.strict,prio:S.prio,seenNewer:S.seenNewer,rosters:ROSTERS}));}catch(e){}
+}
+/* Hinweis, sobald es bei der Quelle eine neuere NHL-Version gibt. Umgestellt wird nur von Hand. */
+function newerHtml(always){
+  var n=D&&D.meta.newer; if(!n) return '';
+  if(!always && S.seenNewer>=n.version) return '';
+  return '<p class="note">'+esc(n.game)+' ist da: Bei HUT Builder stehen schon '+Number(n.skaters).toLocaleString('de-DE')+' Karten. Diese App bleibt bei '+esc(D.meta.game)+', bis du umstellst (Setup).'+
+    (always?'':' <button class="chip" id="newer-ok">Verstanden</button>')+'</p>';
+}
+function owned(){return S.owned.map(function(k){return byKey[k];}).filter(Boolean);}
+function isOwned(c){return S.owned.indexOf(key(c))>=0;}
+function money(v){return '$'+(Math.round(v*10)/10).toFixed(1)+'M';}
+function tab(){var h=(location.hash||'').replace('#','');return ['karten','kader','reihen','setup'].indexOf(h)>=0?h:'karten';}
+
+function sub(c){
+  return '<b>'+c.ovr+'</b> · '+[c.pos, c.hand==='L'?'links':'rechts', c.ctn, c.tmn, money(c.sal||0)].map(esc).join(' · ');
+}
+/* Kartenbild direkt von der Quelle, erst beim Scrollen geladen. Laedt es nicht, bleibt die OVR-Zahl stehen. */
+function img(c,cls){
+  if(!c.art||!D.meta.img_base) return '';
+  return '<img'+(cls?' class="'+cls+'"':'')+' src="'+esc(D.meta.img_base+c.art)+'" alt="Karte '+esc(c.n)+' '+c.ovr+'" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">';
+}
+function rowHtml(c, mode){
+  var k=key(c), own=isOwned(c), open=UI.open===k;
+  var btn = mode==='kader'
+    ? '<button class="act del" data-rm="'+k+'" aria-label="'+esc(c.n)+' aus dem Kader entfernen">×</button>'
+    : '<button class="act'+(own?' on':'')+'" data-tg="'+k+'" aria-pressed="'+own+'" aria-label="'+esc(c.n)+(own?' aus dem Kader entfernen':' zum Kader hinzufügen')+'">'+(own?'✓':'+')+'</button>';
+  return '<div class="row'+(own&&mode!=='kader'?' own':'')+'">'+
+    '<div class="rowhead"><div class="art"><div class="ovr">'+c.ovr+'<small>'+esc(c.pos)+'</small></div>'+img(c)+'</div>'+
+    '<button class="open" data-open="'+k+'" aria-expanded="'+open+'"><div class="nm">'+esc(c.n)+'</div><div class="sub">'+sub(c)+'</div></button>'+btn+'</div>'+
+    (open?detailHtml(c):'')+'</div>';
+}
+function detailHtml(c){
+  var labels=c.k==='g'?GA:SA, h='<div class="detail">'+img(c,'big');
+  h+='<div class="small mute">'+esc(typeName[c.ctn]||c.ctn)+' · '+esc(teamName[c.tm]||c.tmn)+' · '+esc(c.lgn)+' · '+esc(c.nat)+' · '+esc(c.hgt)+', '+(c.wgt||'?')+' lb'+(c.aovr?' · aOVR '+c.aovr.toFixed(2):'')+'</div>';
+  if(c.xf&&c.xf.length){h+='<div class="pills">'+c.xf.map(function(x){return '<span class="pill a">'+esc(xfName[x]||('X-Factor '+x))+'</span>';}).join('')+'</div>';}
+  h+='<div class="attrs">'+c.a.map(function(v,i){return '<div class="attr'+(v>=95?' hi':'')+'"><span>'+labels[i]+'</span><b>'+v+'</b></div>';}).join('')+'</div>';
+  var others=(byName[c.n]||[]).filter(function(o){return o!==c;});
+  if(others.length){
+    h+='<div class="small"><span class="mute">Weitere Karten: </span>'+others.slice(0,10).map(function(o){
+      return '<button class="chip" data-open="'+key(o)+'" data-jump="1">'+o.ovr+' '+esc(o.ctn)+' '+esc(o.tmn)+'</button>';}).join(' ')+'</div>';
+  }
+  return h+'</div>';
+}
+
+function filtered(){
+  var q=UI.q.trim().toUpperCase(), min=+UI.min||0;
+  var out=D.cards.filter(function(c){
+    if(q && c.n.indexOf(q)<0) return false;
+    if(UI.pos){
+      if(UI.pos==='F'){ if(['LW','C','RW'].indexOf(c.pos)<0) return false; }
+      else if(UI.pos==='D'){ if(['LD','RD'].indexOf(c.pos)<0) return false; }
+      else if(c.pos!==UI.pos) return false;
+    }
+    if(UI.type && c.ctn!==UI.type) return false;
+    if(min && c.ovr<min) return false;
+    return true;
+  });
+  if(UI.sort==='new') out.sort(function(a,b){return a.add<b.add?1:a.add>b.add?-1:b.ovr-a.ovr;});
+  else if(UI.sort==='sal') out.sort(function(a,b){return (a.sal||0)-(b.sal||0)||b.ovr-a.ovr;});
+  else if(UI.sort==='aovr') out.sort(function(a,b){return (b.aovr||0)-(a.aovr||0);});
+  return out;
+}
+function viewKarten(){
+  var pos=[['','Alle'],['F','Sturm'],['D','Abwehr'],['LW','LW'],['C','C'],['RW','RW'],['LD','LD'],['RD','RD'],['G','G']];
+  var types=D.lists.card_type.slice().sort(function(a,b){return a.name.localeCompare(b.name);});
+  var h=newerHtml(false)+'<div class="filters">'+
+    '<input type="search" id="q" placeholder="Spielername suchen" aria-label="Spielername suchen" value="'+esc(UI.q)+'" autocomplete="off">'+
+    '<div class="chips" role="group" aria-label="Position">'+pos.map(function(p){return '<button class="chip" data-pos="'+p[0]+'" aria-pressed="'+(UI.pos===p[0])+'">'+p[1]+'</button>';}).join('')+'</div>'+
+    '<div class="two"><select id="f-type" aria-label="Kartentyp"><option value="">Alle Kartentypen</option>'+types.map(function(t){return '<option value="'+esc(t.abbr)+'"'+(UI.type===t.abbr?' selected':'')+'>'+esc(t.name)+'</option>';}).join('')+'</select>'+
+    '<select id="f-min" aria-label="Mindest-Overall"><option value="">Jede Stärke</option>'+[80,84,86,88,90,92].map(function(v){return '<option value="'+v+'"'+(+UI.min===v?' selected':'')+'>ab '+v+' OVR</option>';}).join('')+'</select></div>'+
+    '<select id="f-sort" aria-label="Sortierung">'+[['ovr','Sortiert nach Overall'],['aovr','Sortiert nach Adjusted Overall'],['new','Neueste Karten zuerst'],['sal','Günstigstes Gehalt zuerst']].map(function(o){return '<option value="'+o[0]+'"'+(UI.sort===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select>'+
+    '</div><div id="results"></div>';
+  view.innerHTML=h; results();
+}
+function results(){
+  var el=document.getElementById('results'); if(!el) return;
+  var all=filtered(), show=all.slice(0,UI.limit);
+  el.innerHTML='<p class="mute small">'+all.length.toLocaleString('de-DE')+' Karten. Mit + legst du eine Karte in deinen Kader.</p>'+
+    '<div class="list">'+show.map(function(c){return rowHtml(c,'karten');}).join('')+'</div>'+
+    (all.length>show.length?'<p style="margin-top:12px"><button class="btn ghost" id="more" style="width:100%">Mehr anzeigen</button></p>':'')+
+    (all.length?'':'<div class="center mute">Keine Karte passt zu diesen Filtern.</div>');
+}
+
+function viewKader(){
+  var o=owned();
+  if(!o.length){view.innerHTML='<div class="center"><h2>Dein Kader ist leer</h2><p class="mute">Suche deine Karten unter Karten und tippe auf +. Der Kader bleibt in diesem Browser gespeichert.</p><a class="btn" href="#karten">Karten suchen</a></div>';return;}
+  var groups=[['Sturm',['LW','C','RW']],['Abwehr',['LD','RD']],['Tor',['G']]], h='';
+  var sal=o.reduce(function(s,c){return s+(c.sal||0);},0);
+  h+='<p class="mute small">'+o.length+' Karten, Gehalt aller Karten zusammen '+money(sal)+'.</p>';
+  groups.forEach(function(g){
+    var list=o.filter(function(c){return g[1].indexOf(c.pos)>=0;}).sort(function(a,b){return g[1].indexOf(a.pos)-g[1].indexOf(b.pos)||b.ovr-a.ovr;});
+    h+='<h2>'+g[0]+' ('+list.length+')</h2>'+(list.length?'<div class="list">'+list.map(function(c){return rowHtml(c,'kader');}).join('')+'</div>':'<p class="mute small">Noch keine Karte.</p>');
+  });
+  h+='<p style="margin-top:20px"><button class="btn ghost" id="clear">Kader leeren</button> <span id="clear-ask"></span></p>';
+  view.innerHTML=h;
+}
+
+function pillsFor(b){
+  var p=[];
+  if(b.overall) p.push('<span class="pill o">+'+b.overall+' OVR</span>');
+  if(b.ability_points) p.push('<span class="pill a">+'+b.ability_points+' AP</span>');
+  if(b.salary) p.push('<span class="pill s">+$'+b.salary+'M</span>');
+  return p.length?p.join(''):'<span class="pill n">kein Bonus</span>';
+}
+function lineHtml(title,l){
+  var n=l.players.length;
+  return '<div class="line"><div class="linehead"><strong>'+title+'</strong><div class="pills">'+pillsFor(l.boosts)+'</div></div>'+
+    '<div class="players n'+n+'">'+l.players.map(function(p){
+      return '<div class="pl">'+img(p)+'<div class="p">'+esc(p.pos)+' · '+esc(p.ctn)+' · '+esc(p.tmn)+'</div><div class="n">'+esc(p.n)+'</div><div class="v"><b>'+(p.ovr+l.boosts.overall)+'</b> '+(l.boosts.overall?'('+p.ovr+'+'+l.boosts.overall+') ':'')+money(p.sal||0)+'</div></div>';}).join('')+'</div>'+
+    l.active.map(function(c){
+      var lab=c.type==='overall'?'+'+c.boost+' OVR':c.type==='ability_points'?'+'+c.boost+' AP':'+$'+c.boost+'M';
+      return '<div class="combo">'+esc(c.src==='Coach'?'Coach: ':'')+c.slots.map(function(s){return esc(s.map(function(r){return r.name;}).join(' & '));}).join(' + ')+' → '+lab+'</div>';}).join('')+
+    '</div>';
+}
+function viewReihen(){
+  var o=owned();
+  if(!o.length){view.innerHTML='<div class="center"><h2>Noch keine Karten im Kader</h2><p class="mute">Der Optimierer rechnet mit den Karten, die du besitzt. Lege sie zuerst unter Karten an.</p><a class="btn" href="#karten">Karten suchen</a></div>';return;}
+  var w=PRIO[S.prio]||PRIO.bal, cap=parseFloat(S.cap)||0, apBase=parseFloat(S.ap)||0;
+  var r=HUT.optimize(D,o,{coach:S.coach,strict:S.strict,cap:cap,w:w}), t=r.totals;
+  var used=t.sal, capEff=cap?cap+t.salBoost:0, h='';
+  h+='<div class="tiles">'+
+    '<div class="tile o"><b>'+(t.n?t.avg.toFixed(1):'–')+'</b><span>Ø Overall mit Boni</span></div>'+
+    '<div class="tile a"><b>'+(apBase?(apBase+t.ap):'+'+t.ap)+'</b><span>Ability Points'+(apBase?' ('+apBase+' + '+t.ap+' Bonus)':' Bonus')+'</span></div>'+
+    '<div class="tile s'+(cap&&used>capEff+1e-9?' bad':'')+'"><b>'+money(used)+'</b><span>Gehalt'+(cap?' von '+money(capEff)+' ('+money(cap)+' + '+money(t.salBoost)+')':' · Cap-Bonus +'+money(t.salBoost))+'</span></div>'+
+    '<div class="tile o"><b>+'+t.boostOvr+'</b><span>OVR-Boni über alle Reihen</span></div></div>';
+  if(r.capFailed) h+='<p class="note warn">Mit diesem Kader bleibt keine vollständige Aufstellung unter dem Cap. Angezeigt wird die stärkste Aufstellung ohne Cap.</p>';
+  else if(r.capAdjusted) h+='<p class="note">Die stärkste Aufstellung lag über dem Cap. Diese hier ist die beste, die hineinpasst.</p>';
+  var miss=[]; if(r.missing.f) miss.push(r.missing.f+' Sturmreihe'+(r.missing.f>1?'n':'')); if(r.missing.d) miss.push(r.missing.d+' Abwehrpaar'+(r.missing.d>1?'e':'')); if(r.missing.g) miss.push(r.missing.g+' Goalie'+(r.missing.g>1?'s':''));
+  if(miss.length) h+='<p class="note warn">Für eine komplette Aufstellung fehlen noch: '+miss.join(', ')+'.'+(S.strict?' Feste Positionen sind an (Setup).':'')+'</p>';
+  if(r.forwards.length){h+='<h2>Sturm</h2><div class="list">'+r.forwards.map(function(l,i){return lineHtml((i+1)+'. Reihe',l);}).join('')+'</div>';}
+  if(r.defense.length){h+='<h2>Abwehr</h2><div class="list">'+r.defense.map(function(l,i){return lineHtml((i+1)+'. Paar',l);}).join('')+'</div>';}
+  if(r.goalies.length){h+='<h2>Tor</h2><div class="line"><div class="players n2">'+r.goalies.map(function(p,i){return '<div class="pl">'+img(p)+'<div class="p">'+(i?'Backup':'Starter')+' · '+esc(p.ctn)+' · '+esc(p.tmn)+'</div><div class="n">'+esc(p.n)+'</div><div class="v"><b>'+p.ovr+'</b> '+money(p.sal||0)+'</div></div>';}).join('')+'</div></div>';}
+  var inLine={}; r.forwards.concat(r.defense).forEach(function(l){l.players.forEach(function(p){inLine[key(p)]=1;});}); r.goalies.forEach(function(p){inLine[key(p)]=1;});
+  var bench=o.filter(function(c){return !inLine[key(c)];}).sort(function(a,b){return b.ovr-a.ovr;});
+  if(bench.length) h+='<h2>Nicht aufgestellt ('+bench.length+')</h2><p class="small mute">'+bench.map(function(c){return esc(c.n)+' '+c.ovr+' '+esc(c.pos);}).join(' · ')+'</p>';
+  h+='<p class="small mute" style="margin-top:16px">Priorität: '+esc(w.label)+'. '+(S.coach?'Coach: '+esc(S.coach)+'.':'Kein Coach gewählt.')+' Ändern unter Setup.</p>';
+  view.innerHTML=h;
+}
+
+function viewSetup(){
+  var m=D.meta, h='';
+  h+='<h2>Regeln für den Optimierer</h2>'+
+   '<div class="field"><label for="s-cap">Salary Cap in Mio. $</label><input id="s-cap" type="number" inputmode="decimal" min="0" step="0.5" placeholder="leer = ohne Cap rechnen" value="'+esc(S.cap)+'"><small>Dein Basis-Cap aus dem Spiel, ohne Chemistry-Boni. Die Boni rechnet die App dazu.</small></div>'+
+   '<div class="field"><label for="s-ap">Ability Points ohne Boni</label><input id="s-ap" type="number" inputmode="numeric" min="0" step="1" placeholder="optional" value="'+esc(S.ap)+'"></div>'+
+   '<div class="field"><label for="s-coach">Coach</label><select id="s-coach"><option value="">Kein Coach</option>'+D.coaches.map(function(c){return '<option value="'+esc(c.name)+'"'+(S.coach===c.name?' selected':'')+'>'+esc(c.name)+' ('+esc(c.meta[0]||'')+')</option>';}).join('')+'</select><small>Jeder Coach bringt eigene Reihen-Combos für sein Team mit.</small></div>'+
+   '<div class="field"><label for="s-prio">Priorität</label><select id="s-prio">'+Object.keys(PRIO).map(function(k){return '<option value="'+k+'"'+(S.prio===k?' selected':'')+'>'+PRIO[k].label+'</option>';}).join('')+'</select></div>'+
+   '<label class="check"><input type="checkbox" id="s-strict"'+(S.strict?' checked':'')+'> Feste Positionen (LW, C, RW und LD, RD)</label>'+
+   '<p class="note">So rechnet die App: Ein Combo greift, wenn jede Anforderung von einem anderen Spieler der Reihe erfüllt wird. Alle passenden Combos einer Reihe zählen zusammen, +OVR gilt für jeden Spieler der Reihe. Kein Spieler steht doppelt in der Aufstellung.</p>'+
+   '<h2>Daten</h2><p class="small mute">'+m.skaters.toLocaleString('de-DE')+' Feldspieler, '+m.goalies+' Goalies, '+m.combos+' Chemistry Combos, '+m.coaches+' Coaches.<br>Stand '+new Date(m.updated).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'})+' Uhr. Quelle: <a href="'+esc(m.img_base||'https://nhlhutbuilder.com/')+'">NHL HUT Builder</a>.</p>'+
+   '<h2>NHL-Version</h2>'+newerHtml(true)+'<p class="small mute">Eingestellt ist '+esc(m.game||'')+'. Die App wechselt nie von selbst auf ein neues Spiel. Zum Umstellen die Zahl in der Datei version.txt im Repo ändern, zum Beispiel auf 28. Dein Kader bleibt je Version getrennt gespeichert.</p>';
+  view.innerHTML=h;
+}
+
+function render(){
+  var t=tab();
+  Array.prototype.forEach.call(document.querySelectorAll('nav a'),function(a){ if(a.dataset.tab===t) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current'); });
+  document.getElementById('n-kader').textContent=S.owned.length+(S.owned.length===1?' Karte':' Karten');
+  if(!D) return;
+  ({karten:viewKarten,kader:viewKader,reihen:viewReihen,setup:viewSetup})[t]();
+}
+function toggle(k){var i=S.owned.indexOf(k); if(i>=0) S.owned.splice(i,1); else S.owned.push(k); save();}
+
+view.addEventListener('click',function(e){
+  var b=e.target.closest('button'); if(!b) return;
+  if(b.dataset.tg){toggle(b.dataset.tg); document.getElementById('n-kader').textContent=S.owned.length+(S.owned.length===1?' Karte':' Karten'); results(); return;}
+  if(b.dataset.rm){toggle(b.dataset.rm); render(); return;}
+  if(b.dataset.open){
+    if(b.dataset.jump){var c=byKey[b.dataset.open]; if(tab()==='karten'){UI.q=c.n; UI.pos='';UI.type='';UI.min='';UI.open=b.dataset.open; viewKarten();} else {UI.open=b.dataset.open; render();} return;}
+    UI.open=UI.open===b.dataset.open?null:b.dataset.open; if(tab()==='karten') results(); else render(); return;}
+  if(b.dataset.pos!==undefined){UI.pos=b.dataset.pos; UI.limit=40; viewKarten(); return;}
+  if(b.id==='newer-ok'){S.seenNewer=D.meta.newer.version; save(); viewKarten(); return;}
+  if(b.id==='more'){UI.limit+=60; results(); return;}
+  if(b.id==='clear'){document.getElementById('clear-ask').innerHTML='<button class="btn" id="clear-yes">Wirklich alle '+S.owned.length+' entfernen</button>'; return;}
+  if(b.id==='clear-yes'){S.owned=[]; save(); render(); return;}
+});
+view.addEventListener('input',function(e){
+  var t=e.target;
+  if(t.id==='q'){UI.q=t.value; UI.limit=40; results();}
+  else if(t.id==='s-cap'){S.cap=t.value; save();}
+  else if(t.id==='s-ap'){S.ap=t.value; save();}
+});
+view.addEventListener('change',function(e){
+  var t=e.target;
+  if(t.id==='f-type'){UI.type=t.value; UI.limit=40; results();}
+  else if(t.id==='f-min'){UI.min=t.value; UI.limit=40; results();}
+  else if(t.id==='f-sort'){UI.sort=t.value; UI.limit=40; results();}
+  else if(t.id==='s-coach'){S.coach=t.value; save();}
+  else if(t.id==='s-prio'){S.prio=t.value; save();}
+  else if(t.id==='s-strict'){S.strict=t.checked; save();}
+});
+window.addEventListener('hashchange',function(){UI.open=null; render(); view.scrollTop=0;});
+
+load(); render();
+fetch('hut.json').then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }).then(function(d){
+  D=d;
+  VER=String(d.meta.version||((d.meta.img_base||'').match(/NHL(\d+)/)||[])[1]||'');
+  S.owned=(ROSTERS[VER]||[]).slice();
+  document.getElementById('game').textContent=d.meta.game||(VER?'NHL '+VER:'');
+  if(S.coach && !d.coaches.some(function(c){return c.name===S.coach;})) S.coach='';
+  d.cards.forEach(function(c){byKey[key(c)]=c; (byName[c.n]=byName[c.n]||[]).push(c);});
+  d.lists.xfactor.forEach(function(x){xfName[x.id]=x.name.replace(' - ',' · ');});
+  d.lists.team.forEach(function(t){teamName[t.id]=t.name;});
+  d.lists.card_type.forEach(function(t){typeName[t.abbr]=t.name;});
+  document.getElementById('stand').textContent='Stand '+new Date(d.meta.updated).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+  document.getElementById('n-karten').textContent=d.cards.length.toLocaleString('de-DE');
+  render();
+}).catch(function(err){
+  view.innerHTML='<div class="center"><h2>Kartendaten konnten nicht geladen werden</h2><p class="mute">'+esc(err.message)+'. Lade die Seite neu.</p></div>';
+});
+})();
+</script>
+</body>
+</html>

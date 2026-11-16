@@ -1,0 +1,42 @@
+name: Daten holen und Seite veröffentlichen
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 4 * * *"   # täglich 04:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Schlägt der Abruf fehl, bricht der Lauf hier ab und die bisherige Seite bleibt online.
+      - name: Kartendaten abrufen
+        run: |
+          python3 scraper/scrape.py data
+          cp data/hut.json app/hut.json
+      - name: Optimierer testen
+        run: node tests/test_engine.js "$PWD"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: app
+      - id: deployment
+        uses: actions/deploy-pages@v4
