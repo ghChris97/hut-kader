@@ -70,7 +70,7 @@ def row_id(r):
 
 LEGACY = False  # aeltere Seitenversion: nur einfache Sortierung, keine Zusatzfilter
 LEGACY_START = 0.0
-LEGACY_BUDGET = float(os.environ.get("LEGACY_BUDGET_MIN", "25")) * 60
+LEGACY_BUDGET = float(os.environ.get("LEGACY_BUDGET_MIN", "90")) * 60
 
 
 def table(endpoint, cols, referer):
@@ -209,7 +209,10 @@ def card(row, kind, maps):
         "n": text(row.get("full_name")),
         "ct": maps["card"].get(row.get("card_logo") or "", 0) or maps.get("card_abbr", {}).get(row.get("card") or "", 0),
         "ctn": row.get("card") or "",
-        "tm": maps["team"].get(row.get("team_logo") or "", 0) or maps["team_abbr"].get(row.get("team") or "", 0),
+        "tm": maps["team"].get(row.get("team_logo") or "", 0)
+              or maps.get("team_lg", {}).get((row.get("league") or "", row.get("team") or ""), 0)
+              or maps.get("team_lg_name", {}).get((row.get("league") or "", row.get("team") or ""), 0)
+              or maps["team_abbr"].get(row.get("team") or "", 0),
         "tmn": row.get("team") or "",
         "lg": maps["league"].get(row.get("league_logo") or "", 0) or maps.get("league_name", {}).get(row.get("league") or "", 0),
         "nid": maps.get("nat", {}).get(row.get("nationality") or "", 0),
@@ -283,12 +286,27 @@ def options(html_text, select_re):
     return [(v, html.unescape(t).strip()) for v, t in re.findall(r'<option[^>]*value="([^"]*)"[^>]*>([^<]*)', m.group(1)) if v != ""]
 
 
+def option_groups(html_text, select_re):
+    m = re.search(select_re + r'[^>]*>(.*?)</select>', html_text, re.S)
+    out = []
+    if not m:
+        return out
+    for g in re.finditer(r'<optgroup label="([^"]*)"[^>]*>(.*?)</optgroup>', m.group(1), re.S):
+        for v, t in re.findall(r'<option[^>]*value="([^"]*)"[^>]*>([^<]*)', g.group(2)):
+            if v != "":
+                out.append((html.unescape(g.group(1)), v, html.unescape(t).strip()))
+    return out
+
+
 def legacy_lists(stats_html, combos_html):
     """Listen der aelteren Seitenversion aus den Auswahlfeldern zusammensetzen (IDs aus der Combo-Seite)."""
     ct_abbr = {name: ab for ab, name in options(stats_html, r'<select name="card_search"')}
     tm_abbr = {name: ab for ab, name in options(stats_html, r'<select id="team_id"')}
     card_type = [{"id": int(i), "name": n, "abbr": ct_abbr.get(n, ""), "logo": ""} for i, n in options(combos_html, r'<select id="filter-card"')]
-    team = [{"id": int(i), "name": n, "abbr": tm_abbr.get(n, ""), "logo": "", "group": ""} for i, n in options(combos_html, r'<select id="filter-team"')]
+    # Teams je Liga zuordnen: Kuerzel wie "ANA" gibt es sonst bei NHL und NHL-Alumni doppelt
+    ab_by = {(g, n): ab for g, ab, n in option_groups(stats_html, r'<select id="team_id"')}
+    team = [{"id": int(i), "name": n, "abbr": ab_by.get((g, n), tm_abbr.get(n, "")), "logo": "", "group": g}
+            for g, i, n in option_groups(combos_html, r'<select id="filter-team"')]
     nationality = [{"id": int(i), "name": n, "abbr": n, "logo": ""} for i, n in options(combos_html, r'<select id="filter-nationality"')]
     league = [{"id": k + 1, "name": n, "abbr": v, "logo": ""} for k, (v, n) in enumerate(options(stats_html, r'<select id="league_id"'))]
     names = {}
@@ -402,6 +420,8 @@ def build_version(version):
         for i in lists["team"]:
             cnt[i["abbr"]] = cnt.get(i["abbr"], 0) + 1
         maps["team_abbr"] = {i["abbr"]: i["id"] for i in lists["team"] if i["abbr"] and cnt[i["abbr"]] == 1}
+        maps["team_lg"] = {(i["group"], i["abbr"]): i["id"] for i in lists["team"] if i["abbr"]}
+        maps["team_lg_name"] = {(i["group"], i["name"]): i["id"] for i in lists["team"]}
     else:
         sk_cols, go_cols = SKATER_COLS, GOALIE_COLS
         maps = {
