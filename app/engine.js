@@ -494,5 +494,6 @@
 
   root.HUT = { optimize: optimize, comboMatches: comboMatches, evalLine: evalLine, combosFor: combosFor, upgrades: upgrades,
     nearMisses: nearMisses, fillers: fillers, specialTeams: specialTeams, rating: rating, evaluate: evaluate,
-    lineupPlayers: lineupPlayers, key: key, GROUPS: GROUPS, sidesD: sidesD, mixedPair: mixedPair };
+    lineupPlayers: lineupPlayers, key: key, GROUPS: GROUPS, sidesD: sidesD, mixedPair: mixedPair,
+    captainTeams: captainTeams, DIVISIONS: DIVISIONS };
 })(typeof window !== 'undefined' ? window : globalThis);
