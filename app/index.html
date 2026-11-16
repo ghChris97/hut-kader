@@ -576,9 +576,9 @@ function sub(c){
   var v=S.useRating&&c.k==='s'?'<span class="sep">·</span><span>Wert '+valFn()(c).toFixed(1)+'</span>':'';
   var ct=(D.lists.card_type.filter(function(x){return String(x.id)===String(c.ct);})[0]||{});
   return '<span class="meta"><span class="badge-ovr'+tier(c.ovr)+'">'+c.ovr+'</span><span class="k">'+esc(c.pos)+(c.hand?' '+c.hand:'')+'</span><span class="sal">'+money(c.sal||0)+'</span>'+v+'</span>'+
-    '<span class="logos">'+(ct.logo?'<span class="lgi">'+lg(ct.logo,ct.name||c.ctn)+'<em>'+esc(ct.name||c.ctn)+'</em></span>':'<span class="lgi"><em>'+esc(c.ctn)+'</em></span>')+
+    '<span class="logos">'+(c.nat?'<span class="lgi">'+lg(natLogo(c.nat),c.nat,'lg flag')+'</span>':'')+
     '<span class="lgi">'+lg(logoOf('team',c.tm),c.tmn)+'<em>'+esc(c.tmn)+'</em></span>'+
-    (c.nat?'<span class="lgi">'+lg(natLogo(c.nat),c.nat,'lg flag')+'</span>':'')+'</span>';
+    (ct.logo?'<span class="lgi">'+lg(ct.logo,ct.name||c.ctn)+'<em>'+esc(ct.name||c.ctn)+'</em></span>':'<span class="lgi"><em>'+esc(c.ctn)+'</em></span>')+'</span>';
 }
 /* Kartenbild direkt von der Quelle, erst beim Scrollen geladen. Laedt es nicht, bleibt die OVR-Zahl stehen. */
 function img(c,cls){
