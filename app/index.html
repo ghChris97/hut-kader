@@ -215,7 +215,24 @@ details.sg .field{margin-bottom:12px}
 .statgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
 .statgrid label{display:flex;flex-direction:column;gap:4px;font:600 11px/1.2 var(--body);letter-spacing:.06em;color:var(--mute)}
 .statgrid input,.statgrid select{min-height:38px;padding:6px 10px}
-.aprow{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.aprow{display:grid;grid-template-columns:22px 40px 1fr auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line);cursor:pointer}
+.aprow.rec{box-shadow:inset 3px 0 0 var(--ovr);padding-left:6px}
+.apimg{width:40px;aspect-ratio:804/1128;background:var(--surface2);overflow:hidden;display:block}
+.apimg img{width:100%;height:100%;object-fit:cover;display:block}
+.aptx{display:flex;flex-direction:column;gap:2px;min-width:0}
+.apn{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.apn b{font-size:14.5px;font-weight:600}
+.apn .xfi{width:18px;height:18px;align-self:center}
+.apn em{font-style:normal;font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
+.app{font-size:12.5px;color:var(--ice)}
+.aps{display:flex;align-items:center;gap:8px;font-size:12px}
+.aps .off{color:var(--faint)}
+.recl{font:700 10.5px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--ovr)}
+.ape{font-size:11.5px;color:var(--mute);line-height:1.35}
+.apc{display:flex;flex-direction:column;align-items:center;font:700 20px/1 var(--display);color:var(--ap);min-width:34px}
+.apc small{font-size:10px;letter-spacing:.08em;color:var(--mute)}
+.apbtns{margin:8px 0;flex-wrap:nowrap}
+.apbtns .btn{flex:1;justify-content:center;padding:8px 10px;font-size:12.5px}
 .aprow:first-child{border-top:0}
 .aprow input{width:22px;height:22px;accent-color:var(--ap)}
 .cmp{display:grid;grid-template-columns:1fr auto 1fr;gap:6px 10px;align-items:center;font-variant-numeric:tabular-nums}
@@ -335,19 +352,27 @@ body.sheet-open{overflow:hidden}
 .sug-bon{display:grid;grid-template-columns:auto 1fr;gap:4px 8px;align-items:center;margin-top:8px;font-size:12px;color:var(--faint)}
 .sug-bon .pills{gap:4px}
 .sug-bon .pill{font-size:11.5px;padding:1px 8px}
-.req{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:start;padding:9px 0;border-top:1px solid var(--line)}
+.req{display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line)}
+.req>div:nth-child(2){display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;min-width:0}
+.req>div:nth-child(2) p{margin:0;width:100%}
+.req .rw,.req .need{margin-top:0}
+.req .rq{font-size:11.5px;padding:1px 5px 1px 2px} .req .rq img{width:15px;height:15px}
+.req .st{font-size:11.5px;padding:4px 7px}
+.req .rw .pill,.req .pill{font-size:10.5px;padding:2px 5px}
 .req b{font-size:14px} .req .pill{font-size:11px;padding:2px 6px;margin-left:4px}
 .req .rw .pill{margin-left:0}
-.req .ic.face{width:34px;height:48px;padding:0;overflow:hidden;background:none}
+.req .ic.face{width:30px;height:42px;padding:0;overflow:hidden;background:none}
 .req .ic.face img{width:100%;height:100%;object-fit:cover}
-.req .need .k{font-size:11px;padding:2px 6px}
-.reqh{font:700 12px/1 var(--display);letter-spacing:.1em;text-transform:uppercase;color:var(--mute);padding:12px 0 2px;border-top:1px solid var(--line)}
+.req .need{gap:3px}
+.req .need .k{font-size:10.5px;padding:0 5px;line-height:1.7}
+.req .need .k img{width:12px;height:12px}
+.reqh{font:700 11.5px/1 var(--display);letter-spacing:.1em;text-transform:uppercase;color:var(--mute);padding:10px 0 0;border-top:1px solid var(--line)}
 .reqh+.req{border-top:0}
 .mini{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
 .mini .mc{width:34px;aspect-ratio:804/1128;padding:0;border:0;background:var(--surface2);overflow:hidden;cursor:pointer}
 .mini .mc img{width:100%;height:100%;object-fit:cover;display:block}
 .req:first-child{border-top:0;padding-top:2px}
-.req .ic{width:34px;height:34px;border-radius:10px;background:var(--surface2);display:grid;place-items:center}
+.req .ic{width:30px;height:30px;border-radius:10px;background:var(--surface2);display:grid;place-items:center}
 .req .ic svg{width:26px;height:30px}
 .req b{font-weight:600}
 .req p{margin:3px 0 0;font-size:13px;color:var(--mute)}
@@ -869,8 +894,8 @@ function reqHtml(r){
     var dn=divName(cst.cap.teams), lab=cst.type==='ability_points'?'+'+cst.boost+' FP':cst.type==='salary'?'+'+cst.boost+' M$':'+'+cst.boost;
     var cps=HUT.lineupPlayers(r).filter(function(p){return teams[p.tm];});
     h+='<div class="req"><div class="ic face">'+(cc?img(cc):'')+'</div><div><b>Captain '+esc(cc?nice(cc.n):'')+'</b> <span class="pill a">'+lab+'</span>'+
-      '<p>'+cst.need+' Spieler aus '+(dn||'den Zielteams')+', Captain spielt mit</p>'+
-      mini(cps)+'<div class="need">'+Object.keys(teams).filter(function(t){return teamName[t];}).sort(function(a,b){return (inL[b]||0)-(inL[a]||0);}).map(function(t){
+      '<p>'+cst.need+'× '+(dn||'Zielteams')+'</p>'+
+      '<div class="need">'+Object.keys(teams).filter(function(t){return teamName[t];}).sort(function(a,b){return (inL[b]||0)-(inL[a]||0);}).map(function(t){
         var ab=(D.lists.team.filter(function(x){return String(x.id)===String(t);})[0]||{}).abbr||teamName[t];
         var lg=logoOf('team',t);
         return '<span class="k'+(inL[t]?' hit':'')+'">'+(lg?'<img src="'+esc(D.meta.img_base+lg)+'" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">':'')+esc(ab)+(inL[t]?' ×'+inL[t]:'')+'</span>';}).join('')+'</div></div>'+
@@ -891,7 +916,7 @@ function reqHtml(r){
         var cnt={}, first={}; g.slots.forEach(function(sl){var n=slotText(sl); cnt[n]=(cnt[n]||0)+1; first[n]=sl;});
         var txt=Object.keys(cnt).map(function(n){return cnt[n]+'× '+reqSlot(first[n]);}).join(' + ');
         h+='<div class="req"><div class="ic"><svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:var(--blue);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1-4 3.6-6 7-6s6 2 7 6"/><path d="M15.5 4.5l3-1.5"/></svg></div>'+
-          '<div><b>'+(g.line==='forwards'?'Sturm':'Abwehr')+':</b> '+txt+'<div class="rw">'+rewardPills(g.combos)+'</div>'+mini(hp)+'</div>'+
+          '<div><b>'+(g.line==='forwards'?'Sturm':'Abwehr')+':</b> '+txt+'<div class="rw">'+rewardPills(g.combos)+'</div></div>'+
           '<span class="st '+(hit?'ok':'no')+'">'+(hit?hit+'× aktiv':'nicht aktiv')+'</span></div>';
       });
     }
@@ -962,12 +987,18 @@ function apHtml(r){
   items.sort(function(a,b){return b.sc-a.sc||a.ap-b.ap;}).forEach(function(it){
     var info=it.info, p=it.p, id=it.id, on=!!V.xfOn[id]; all+=info.ap; if(on) used+=info.ap;
     var stars=Math.max(1,Math.round(it.sc/top*5)), rec=best[id];
-    rows+='<label class="aprow"><input type="checkbox" data-xf="'+id+'"'+(on?' checked':'')+(SHARED?' disabled':'')+'><span><b>'+esc(nice(info.n))+'</b> <span class="mute">'+esc(info.t)+' · '+esc(nice(p.n))+'</span>'+(rec?' <span class="pill o">Empfohlen</span>':'')+'<br><span class="small"><span class="stars" aria-label="'+stars+' von 5">'+'★★★★★'.slice(0,stars)+'<span class="mute">'+'★★★★★'.slice(stars)+'</span></span></span> <span class="small mute">'+info.e.map(function(e){return esc(e[0])+' '+esc(e[1]);}).join(', ')+'</span></span><span class="pill a">'+info.ap+' AP</span></label>';
+    rows+='<label class="aprow'+(rec?' rec':'')+'"><input type="checkbox" data-xf="'+id+'"'+(on?' checked':'')+(SHARED?' disabled':'')+'>'+
+      '<span class="apimg">'+img(p)+'</span>'+
+      '<span class="aptx"><span class="apn">'+(xfLogo[id.split(':')[1]]?'<img class="xfi" src="'+esc(D.meta.img_base+xfLogo[id.split(':')[1]])+'" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">':'')+'<b>'+esc(nice(info.n))+'</b><em>'+esc(info.t)+'</em></span>'+
+      '<span class="app">'+esc(nice(p.n))+' · '+esc(p.pos)+'</span>'+
+      '<span class="aps"><span class="stars" aria-label="'+stars+' von 5">'+'★★★★★'.slice(0,stars)+'<span class="off">'+'★★★★★'.slice(stars)+'</span></span>'+(rec?'<span class="recl">Empfohlen</span>':'')+'</span>'+
+      '<span class="ape">'+info.e.map(function(e){return esc(e[0])+' '+esc(e[1]);}).join(' · ')+'</span></span>'+
+      '<span class="apc">'+info.ap+'<small>AP</small></span></label>';
   });
   var cls=used>budget?'warn':'ap';
-  return '<p class="note '+cls+'"><b>'+used+' von '+budget+' AP</b> verplant'+(used>budget?', das sind '+(used-budget)+' zu viel':'')+'. Alle X-Factors der Aufstellung zusammen würden '+all+' AP kosten.'+(parseFloat(S.ap)?'':' Trag deine Basis-AP im Setup ein, sonst zählen nur die Boni.')+'</p>'+
-    '<p class="small mute">Sterne = meine Einschätzung, wie viel die Ability diesem Spieler bringt: Stärke der Ability im aktuellen Meta, Stufe, passende Werte des Spielers, Position und Eiszeit (1. Reihe und Starting-Goalie zählen mehr). „Empfohlen" ist die beste Kombination, die in dein AP-Budget passt.</p>'+
-    (SHARED?'':'<div class="btns" style="margin:8px 0"><button class="btn ghost sm" id="ap-auto">Empfehlung übernehmen</button><button class="btn ghost sm" id="ap-none">Alle abwählen</button></div>')+'<div>'+rows+'</div>';
+  return '<p class="note '+cls+'"><b>'+used+' / '+budget+' AP</b> verplant'+(used>budget?' ('+(used-budget)+' zu viel)':'')+' · alle zusammen '+all+' AP'+(parseFloat(S.ap)?'':'<br><span class="small mute">Basis-AP im Setup eintragen, sonst zählen nur die Boni.</span>')+'</p>'+
+    '<p class="small mute">Sterne = meine Einschätzung, was die Ability diesem Spieler bringt (Stärke, Stufe, passende Werte, Eiszeit). Empfohlen = beste Wahl fürs AP-Budget.</p>'+
+    (SHARED?'':'<div class="btns apbtns"><button class="btn ghost sm" id="ap-auto">Empfehlung übernehmen</button><button class="btn ghost sm" id="ap-none">Alle abwählen</button></div>')+'<div>'+rows+'</div>';
 }
 /* Rucksack: beste Summe der Werte, die ins AP-Budget passt */
 function xfBest(items,budget){
