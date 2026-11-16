@@ -337,7 +337,7 @@ function sharedHtml(){
 function viewKader(){
   if(UI.imp){viewImport();return;}
   var o=owned(), h=sharedHtml();
-  var imp=SHARED?'':'<div class="btns" style="margin-bottom:12px"><button class="btn sm" id="imp-shot">Aus Screenshot einlesen</button><button class="btn ghost sm" id="imp-cam">Foto aufnehmen</button>'+(o.length?'<button class="btn ghost sm" id="share">Kader teilen</button>':'')+'</div>';
+  var imp=SHARED?'':'<div class="btns" style="margin-bottom:12px"><button class="btn sm" id="imp-shot">Aus Bild einlesen</button><button class="btn ghost sm" id="imp-cam">Foto aufnehmen</button><button class="btn ghost sm" id="imp-paste">Text einfügen</button>'+(o.length?'<button class="btn ghost sm" id="share">Kader teilen</button>':'')+'</div>';
   if(!o.length){view.innerHTML=h+'<div class="center"><h2>Dein Kader ist leer</h2><p class="mute">Suche deine Karten unter Karten und tippe auf +, oder lies sie aus einem Screenshot deiner Aufstellung ein.</p>'+imp+'<a class="btn ghost" href="#karten">Karten suchen</a></div>';return;}
   var groups=[['Sturm',['LW','C','RW']],['Abwehr',['LD','RD']],['Tor',['G']]];
   var sal=o.reduce(function(s,c){return s+(c.sal||0);},0), ns=newSince();
@@ -607,63 +607,96 @@ function matchText(text){
   });
   return found;
 }
-function loadScript(src){return new Promise(function(ok,no){var s=document.createElement('script'); s.src=src; s.onload=ok; s.onerror=function(){no(new Error('Die Texterkennung konnte nicht geladen werden. Dafür brauchst du eine Internetverbindung.'));}; document.head.appendChild(s);});}
-function prepImage(file){ // vergroessern und dunkle Bilder umkehren, damit die Schrift dunkel auf hell steht
+var SCAN_URL='https://vbdgynxlcwuavhzakysy.supabase.co/functions/v1/hut-scan';
+function prepImage(file){ // verkleinern und als JPEG kodieren, damit der Upload klein bleibt
   return new Promise(function(ok,no){
     var url=URL.createObjectURL(file), im=new Image();
     im.onload=function(){
-      var max=2200, sc=Math.min(2.2, max/Math.max(im.width,im.height)); if(sc<1&&Math.max(im.width,im.height)<=max) sc=1;
+      var sc=Math.min(1, 1800/Math.max(im.width,im.height));
       var c=document.createElement('canvas'); c.width=Math.round(im.width*sc); c.height=Math.round(im.height*sc);
-      var x=c.getContext('2d'); x.drawImage(im,0,0,c.width,c.height); URL.revokeObjectURL(url);
-      try{
-        var d=x.getImageData(0,0,c.width,c.height), p=d.data, sum=0, n=p.length/4;
-        for(var i=0;i<p.length;i+=4){var g=(p[i]*3+p[i+1]*6+p[i+2])/10; p[i]=p[i+1]=p[i+2]=g; sum+=g;}
-        if(sum/n<120){ for(var j=0;j<p.length;j+=4){p[j]=p[j+1]=p[j+2]=255-p[j];} }
-        x.putImageData(d,0,0);
-      }catch(e){}
-      ok(c);
+      c.getContext('2d').drawImage(im,0,0,c.width,c.height); URL.revokeObjectURL(url);
+      ok(c.toDataURL('image/jpeg',0.85).split(',')[1]);
     };
     im.onerror=function(){URL.revokeObjectURL(url); no(new Error('Das Bild konnte nicht gelesen werden.'));};
     im.src=url;
   });
 }
+function scanImage(b64){
+  return fetch(SCAN_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:b64,mime:'image/jpeg'})})
+    .then(function(r){return r.json().catch(function(){return {error:'HTTP '+r.status};}).then(function(j){ if(!r.ok||j.error) throw new Error(j.error||('HTTP '+r.status)); return j.cards||[]; });},
+          function(){throw new Error('Keine Verbindung zum Scan-Dienst. Für das Einlesen brauchst du Internet.');});
+}
+var POSMAP={LA:'LW',RA:'RW',LV:'LD',RV:'RD',LF:'LW',RF:'RW',D:'',F:'',TW:'G',GK:'G'};
+/* Karten zu einem gelesenen Namen finden: voller Name, sonst Nachname (mit Vornamen-Initiale), sonst ein Tippfehler Abstand */
+function cardsForName(name){
+  buildNames();
+  var t=norm(name).split(' ').filter(Boolean); if(!t.length) return [];
+  var full=t.join(' '), hit=NAMES.filter(function(e){return e.toks.join(' ')===full;});
+  if(!hit.length){
+    var last=t[t.length-1], group=SUR[last];
+    if(!group&&last.length>=5){var surs=Object.keys(SUR); for(var i=0;i<surs.length;i++) if(near1(last,surs[i])){group=SUR[surs[i]]; break;}}
+    if(!group&&t.length>1){ // Nachname zuerst gelesen, z. B. "BERTUZZI TYLER"
+      group=SUR[t[0]]; if(group) t=t.slice(1).concat([t[0]]);
+    }
+    if(group){
+      var first=t.length>1?t[0]:'';
+      var exactFirst=group.filter(function(e){return first&&e.first===first;});
+      var nearFirst=group.filter(function(e){return first&&(e.first[0]===first[0]);});
+      hit=exactFirst.length?exactFirst:(nearFirst.length?nearFirst:group);
+    }
+  }
+  var cards=[]; hit.forEach(function(e){byName[e.n].forEach(function(c){cards.push(c);});});
+  return cards;
+}
+function matchScan(list){
+  var found=[], seen={};
+  list.forEach(function(it){
+    var cards=cardsForName(it.name||''); if(!cards.length){found.push({cards:[],token:it.name,ovr:it.ovr,on:false}); return;}
+    var shown=+it.ovr||0, pos=String(it.pos||'').toUpperCase(); pos=POSMAP[pos]!==undefined?POSMAP[pos]:pos;
+    // Im Spiel steht die OVR inklusive Reihen-Bonus, deshalb auch 1 bis 2 Punkte darunter zulassen
+    var score=function(c){var d=shown-c.ovr; var s=d===0?10:d===1?8:d===2?6:d===-1?3:0; if(pos&&c.pos===pos) s+=2; if(pos==='G'&&c.k==='g') s+=2; return s;};
+    cards.sort(function(a,b){return score(b)-score(a)||b.ovr-a.ovr;});
+    var best=cards[0], k=key(best); if(seen[k]) return; seen[k]=1;
+    found.push({cards:cards.slice(0,24),sel:k,on:!isOwned(best),sure:score(best)>=8,token:it.name,ovr:shown,line:it.line||''});
+  });
+  return found;
+}
 function runImport(files){
   files=Array.prototype.slice.call(files||[]); if(!files.length) return;
-  UI.imp={step:'ocr',msg:'Texterkennung wird geladen …',p:0,found:[],text:''}; if(tab()!=='kader') location.hash='#kader'; else viewKader();
-  var worker=null;
-  var lib=window.Tesseract?Promise.resolve():loadScript('https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js');
-  lib.then(function(){
-    return Tesseract.createWorker('eng',1,{logger:function(m){ if(UI.imp&&m.status==='recognizing text'){UI.imp.p=m.progress; var pr=document.getElementById('imp-p'); if(pr) pr.value=m.progress;} }});
-  }).then(function(w){
-    worker=w; var chain=Promise.resolve(), text='';
-    files.forEach(function(f,i){
-      chain=chain.then(function(){UI.imp.msg='Lese Bild '+(i+1)+' von '+files.length+' …'; viewKader(); return prepImage(f);})
-        .then(function(c){return worker.recognize(c);}).then(function(r){text+='\n'+r.data.text;});
-    });
-    return chain.then(function(){return text;});
-  }).then(function(text){
-    if(worker) worker.terminate();
-    UI.imp={step:'review',found:matchText(text),text:text}; viewKader();
-  }).catch(function(e){
-    if(worker) try{worker.terminate();}catch(x){}
-    UI.imp={step:'error',msg:(e&&e.message)||'Die Texterkennung ist fehlgeschlagen.'}; viewKader();
+  UI.imp={step:'scan',msg:'Bild wird vorbereitet …'}; if(tab()!=='kader') location.hash='#kader'; else viewKader();
+  var all=[], chain=Promise.resolve();
+  files.forEach(function(f,i){
+    chain=chain.then(function(){UI.imp.msg='Gemini liest Bild '+(i+1)+' von '+files.length+' …'; viewKader(); return prepImage(f);})
+      .then(scanImage).then(function(cs){all=all.concat(cs);});
   });
+  chain.then(function(){
+    UI.imp={step:'review',found:matchScan(all),raw:all}; viewKader();
+  }).catch(function(e){
+    UI.imp={step:'error',msg:(e&&e.message)||'Das Einlesen ist fehlgeschlagen.'}; viewKader();
+  });
+}
+function runPaste(text){
+  UI.imp={step:'review',found:matchText(text||''),text:text||''}; viewKader();
 }
 function viewImport(){
   var I=UI.imp, h='<h2>Kader einlesen</h2>';
-  if(I.step==='ocr'){view.innerHTML=h+'<p>'+esc(I.msg)+'</p><progress id="imp-p" max="1" value="'+(I.p||0)+'"></progress><p class="small mute" style="margin-top:10px">Das Bild bleibt auf deinem Gerät. Beim ersten Mal lädt die Texterkennung ein paar Megabyte nach.</p>';return;}
-  if(I.step==='error'){view.innerHTML=h+'<p class="note warn">'+esc(I.msg)+'</p><p><button class="btn ghost" id="imp-x">Zurück zum Kader</button></p>';return;}
-  if(!I.found.length){view.innerHTML=h+'<p class="note warn">Auf dem Bild habe ich keinen Spielernamen erkannt. Am besten klappt ein scharfer Screenshot der Aufstellung, auf dem die Namen gut lesbar sind.</p><details><summary>Erkannter Text</summary><div><p class="small mute" style="white-space:pre-wrap">'+esc(I.text.trim()||'(nichts)')+'</p></div></details><p style="margin-top:12px"><button class="btn ghost" id="imp-x">Zurück zum Kader</button></p>';return;}
-  var n=I.found.filter(function(f){return f.on;}).length;
-  h+='<p class="small mute">'+I.found.length+' Namen erkannt. Prüfe bei jedem die richtige Karte, denn die Erkennung liest nur Namen und Zahlen. Bereits vorhandene Karten sind abgewählt.</p><div>';
+  if(I.step==='scan'){view.innerHTML=h+'<p>'+esc(I.msg)+'</p><progress aria-label="Fortschritt"></progress><p class="small mute" style="margin-top:10px">Das Bild geht zum Auslesen an Google Gemini. Das dauert meist 5 bis 15 Sekunden.</p>';return;}
+  if(I.step==='paste'){view.innerHTML=h+'<p class="small mute">Öffne den Screenshot in Google Lens, tippe auf „Text auswählen" und dann auf „Kopieren". Füge den Text hier ein:</p><textarea id="imp-text" rows="8" style="width:100%;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px;color:var(--ice)" aria-label="Kopierter Text"></textarea><div class="btns" style="margin-top:10px"><button class="btn" id="imp-paste-go">Namen suchen</button><button class="btn ghost" id="imp-x">Abbrechen</button></div>';return;}
+  if(I.step==='error'){view.innerHTML=h+'<p class="note warn">'+esc(I.msg)+'</p><div class="btns"><button class="btn ghost" id="imp-paste">Stattdessen Text einfügen</button><button class="btn ghost" id="imp-x">Zurück zum Kader</button></div>';return;}
+  var ok=I.found.filter(function(f){return f.cards.length;}), bad=I.found.filter(function(f){return !f.cards.length;});
+  if(!ok.length){view.innerHTML=h+'<p class="note warn">Auf dem Bild wurde keine Karte erkannt, die es in den Daten gibt. Am besten klappt ein Screenshot oder ein gerades Foto der ganzen Aufstellung.</p><div class="btns"><button class="btn ghost" id="imp-x">Zurück zum Kader</button></div>';return;}
+  var n=ok.filter(function(f){return f.on;}).length;
+  h+='<p class="small mute">'+ok.length+' Karten erkannt. Prüf bei jeder, ob die Version stimmt. Die Zahl im Spiel enthält Reihen-Boni, deshalb steht dort manchmal 1 bis 2 mehr als auf der Karte. Karten, die du schon hast, sind abgewählt.</p><div>';
   I.found.forEach(function(f,i){
+    if(!f.cards.length) return;
     var c=byKey[f.sel];
     h+='<div class="imprt"><input type="checkbox" data-impon="'+i+'"'+(f.on?' checked':'')+' aria-label="'+esc(c.n)+' übernehmen"><div class="art"><div class="ovr" style="font-size:18px">'+c.ovr+'</div>'+img(c)+'</div><div><select data-impsel="'+i+'" aria-label="Karte für '+esc(c.n)+'">'+
-      f.cards.map(function(o){return opt(key(o),o.n+' · '+o.ovr+' '+o.ctn+' '+o.tmn+' '+money(o.sal||0)+(isOwned(o)?' (im Kader)':''),f.sel);}).join('')+'</select>'+
-      '<div class="small mute">gelesen als „'+esc(f.token)+'"'+(f.sure?', OVR passt':'')+'</div></div></div>';
+      f.cards.map(function(o){return opt(key(o),o.n+' · '+o.ovr+' '+o.pos+' '+o.ctn+' '+o.tmn+(isOwned(o)?' (im Kader)':''),f.sel);}).join('')+'</select>'+
+      '<div class="small '+(f.sure?'mute':'')+'" style="'+(f.sure?'':'color:var(--ovr)')+'">gelesen: '+esc(f.token)+(f.ovr?' · '+f.ovr:'')+(f.line?' · '+esc(f.line):'')+(f.sure?'':' · bitte prüfen')+'</div></div></div>';
   });
-  h+='</div><div class="btns" style="margin-top:14px"><button class="btn" id="imp-ok">'+n+' Karten übernehmen</button><button class="btn ghost" id="imp-x">Abbrechen</button></div>'+
-     '<details><summary>Erkannter Text</summary><div><p class="small mute" style="white-space:pre-wrap">'+esc(I.text.trim())+'</p></div></details>';
+  h+='</div>';
+  if(bad.length) h+='<p class="note warn" style="margin-top:10px">Nicht in den Kartendaten gefunden: '+bad.map(function(f){return esc(f.token)+(f.ovr?' ('+f.ovr+')':'');}).join(', ')+'. Such sie unter Karten von Hand.</p>';
+  h+='<div class="btns" style="margin-top:14px"><button class="btn" id="imp-ok">'+n+(n===1?' Karte':' Karten')+' übernehmen</button><button class="btn ghost" id="imp-x">Abbrechen</button></div>';
   view.innerHTML=h;
 }
 
@@ -718,6 +751,8 @@ view.addEventListener('click',function(e){
     case 'imp-shot': document.getElementById('file-shot').click(); break;
     case 'imp-cam': document.getElementById('file-cam').click(); break;
     case 'imp-x': UI.imp=null; viewKader(); break;
+    case 'imp-paste': UI.imp={step:'paste'}; viewKader(); break;
+    case 'imp-paste-go': runPaste(document.getElementById('imp-text').value); break;
     case 'imp-ok':
       var n=0; UI.imp.found.forEach(function(f){ if(f.on&&V.owned.indexOf(f.sel)<0){V.owned.push(f.sel); n++;} });
       UI.imp=null; UI.up=null; save(); viewKader(); toast(n+(n===1?' Karte':' Karten')+' übernommen'); break;
@@ -756,7 +791,7 @@ view.addEventListener('change',function(e){
   else if(d.w){S.weights[d.w]=+t.value; UI.up=null; save();}
   else if(d.xf){ if(t.checked) V.xfOn[d.xf]=1; else delete V.xfOn[d.xf]; UI.dAp=true; var keep=RES; save(); RES=keep; viewReihen(); }
   else if(d.impon!==undefined){UI.imp.found[+d.impon].on=t.checked; viewImport();}
-  else if(d.impsel!==undefined){UI.imp.found[+d.impsel].sel=t.value; UI.imp.found[+d.impsel].on=!isOwned(byKey[t.value]); viewImport();}
+  else if(d.impsel!==undefined){UI.imp.found[+d.impsel].sel=t.value; UI.imp.found[+d.impsel].on=!isOwned(byKey[t.value]); UI.imp.found[+d.impsel].sure=true; viewImport();}
 });
 view.addEventListener('toggle',function(e){
   var t=e.target; if(!t.id) return;
@@ -765,7 +800,7 @@ view.addEventListener('toggle',function(e){
 },true);
 document.getElementById('file-shot').addEventListener('change',function(){runImport(this.files); this.value='';});
 document.getElementById('file-cam').addEventListener('change',function(){runImport(this.files); this.value='';});
-window.addEventListener('hashchange',function(){UI.open=null; UI.saved=-1; if(tab()!=='kader'&&UI.imp&&UI.imp.step!=='ocr') UI.imp=null; render(); view.scrollTop=0;});
+window.addEventListener('hashchange',function(){UI.open=null; UI.saved=-1; if(tab()!=='kader'&&UI.imp&&UI.imp.step!=='scan') UI.imp=null; render(); view.scrollTop=0;});
 
 load(); render();
 fetch('hut.json').then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }).then(function(d){
