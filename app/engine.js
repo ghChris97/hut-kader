@@ -100,8 +100,13 @@
     var w = ctx.w, s = w.ovr * (l.val + l.boosts.overall * l.players.length) +
       w.ap * l.boosts.ability_points + w.sal * l.boosts.salary - lambda * (l.sal - l.boosts.salary);
     for (var i = 0; i < l.players.length; i++) s += extra(ctx, l.players[i]);
+    if (ctx.handBonus && mixedPair(l)) s += ctx.handBonus;
     return s;
   }
+  /* Verteidiger-Paar aus einem Links- und einem Rechtsschuetzen */
+  function mixedPair(l) { return l.players.length === 2 && l.players[0].hand && l.players[1].hand && l.players[0].hand !== l.players[1].hand; }
+  /* Strenge Positionen gelten fuer Verteidiger nicht, wenn sie nach Schusshand verteilt werden */
+  function strictFor(ctx, group) { return group === 'defense' ? ctx.strict && !ctx.dHand : ctx.strict; }
 
   /* k disjunkte Reihen mit maximaler Punktesumme (Branch and Bound ueber die besten Kandidaten). */
   function pickDisjoint(cands, k, ctx, lambda, banned) {
@@ -160,7 +165,8 @@
   }
 
   function totals(res, ctx) {
-    var w = ctx.w, t = { ovrSum: 0, valSum: 0, n: 0, boostOvr: 0, ap: 0, salBoost: 0, sal: 0, locked: 0 };
+    var w = ctx.w, t = { ovrSum: 0, valSum: 0, n: 0, boostOvr: 0, ap: 0, salBoost: 0, sal: 0, locked: 0, mixed: 0 };
+    res.defense.forEach(function (l) { if (mixedPair(l)) t.mixed++; });
     res.forwards.concat(res.defense).forEach(function (l) {
       var k = l.players.length;
       t.ovrSum += l.ovr + l.boosts.overall * k; t.valSum += l.val + l.boosts.overall * k; t.n += k;
@@ -180,7 +186,7 @@
       }
     }
     t.avg = t.n ? t.ovrSum / t.n : 0;
-    t.raw = w.ovr * t.valSum + w.ap * t.ap + w.sal * t.salBoost + LOCK * t.locked;
+    t.raw = w.ovr * t.valSum + w.ap * t.ap + w.sal * t.salBoost + LOCK * t.locked + (ctx.handBonus || 0) * t.mixed;
     return t;
   }
 
@@ -215,7 +221,7 @@
             var old = lines[li], out = old.players[si];
             for (var bi = 0; bi < g.pool.length; bi++) {
               var b = g.pool[bi];
-              if (used[b.n] || (ctx.strict && b.pos !== out.pos)) continue;
+              if (used[b.n] || (strictFor(ctx, g.key) && b.pos !== out.pos)) continue;
               var np = old.players.slice(); np[si] = b;
               lines[li] = evalLine(np, g.combos, ctx.val);
               var t = totals(res, ctx);
@@ -266,8 +272,9 @@
     var dC = usable(combosFor(data, 'defense', opts.coach), dPool);
     return {
       w: opts.w || { ovr: 1, ap: 0.5, sal: 0.25 }, val: val, locks: locks, strict: strict,
+      dHand: opts.dHand || '', handBonus: opts.dHand ? (opts.handBonus != null ? opts.handBonus : 1.5) : 0,
       fPool: fPool, dPool: dPool, fC: fC, dC: dC, goalies: goalies,
-      fCands: candidates(fPool, F_POS, strict, fC, val), dCands: candidates(dPool, D_POS, strict, dC, val),
+      fCands: candidates(fPool, F_POS, strict, fC, val), dCands: candidates(dPool, D_POS, strict && !opts.dHand, dC, val),
       captain: null, capTeams: null, teamBonus: 0, owned: owned
     };
   }
@@ -329,7 +336,7 @@
     ctx.owned.forEach(function (c) { have[key(c)] = 1; });
     lineupPlayers(res).forEach(function (p) { inLineup[p.n] = (inLineup[p.n] || 0) + 1; });
     var fAll = combosFor(data, 'forwards', opts.coach), dAll = combosFor(data, 'defense', opts.coach);
-    var groups = [{ lines: res.forwards, combos: fAll, pos: F_POS, label: '. Reihe' }, { lines: res.defense, combos: dAll, pos: D_POS, label: '. Paar' }];
+    var groups = [{ key: 'forwards', lines: res.forwards, combos: fAll, pos: F_POS, label: '. Reihe' }, { key: 'defense', lines: res.defense, combos: dAll, pos: D_POS, label: '. Paar' }];
     var room = capBase > 0 ? capBase - (res.totals.sal - res.totals.salBoost) : Infinity;
     var minOvr = opts.minOvr || 0, out = [];
     data.cards.forEach(function (c) {
@@ -348,7 +355,7 @@
           g.lines.forEach(function (l, li) {
             for (var si = 0; si < l.players.length; si++) {
               var out0 = l.players[si];
-              if (ctx.strict && out0.pos !== c.pos) continue;
+              if (strictFor(ctx, g.key) && out0.pos !== c.pos) continue;
               if (ctx.locks[key(out0)]) continue;
               if (inLineup[c.n] && out0.n !== c.n) continue;
               if (val(c) < val(out0) - 8) continue;
@@ -414,7 +421,7 @@
     var group = F_POS.indexOf(miss.replace.pos) >= 0 ? F_POS : D_POS;
     return data.cards.filter(function (c) {
       if (c.k !== 's' || !slotOk(c, miss.slot)) return false;
-      if (ctx.strict ? c.pos !== miss.replace.pos : group.indexOf(c.pos) < 0) return false;
+      if (strictFor(ctx, group === D_POS ? 'defense' : 'forwards') ? c.pos !== miss.replace.pos : group.indexOf(c.pos) < 0) return false;
       return !used[c.n] || c.n === miss.replace.n;
     }).map(function (c) { return { card: c, owned: !!ownedKeys[key(c)] }; })
       .sort(function (a, b) { return (b.owned ? 1 : 0) - (a.owned ? 1 : 0) || ctx.val(b.card) - ctx.val(a.card); }).slice(0, n || 3);
@@ -473,7 +480,19 @@
     return res;
   }
 
+  /* Reihenfolge eines Paars fuer die Anzeige: [LV, RV]. off = Linksschuetze rechts (One-Timer), on = Linksschuetze links */
+  function sidesD(players, mode) {
+    var ps = players.slice();
+    if ((mode === 'off' || mode === 'on') && ps.length === 2 && ps[0].hand !== ps[1].hand) {
+      var leftHand = mode === 'off' ? 'R' : 'L';
+      return ps[0].hand === leftHand ? ps : [ps[1], ps[0]];
+    }
+    var order = ['LD', 'RD'], out = [null, null], rest = [];
+    ps.forEach(function (p) { var i = order.indexOf(p.pos); if (i >= 0 && !out[i]) out[i] = p; else rest.push(p); });
+    return out.map(function (p) { return p || rest.shift(); });
+  }
+
   root.HUT = { optimize: optimize, comboMatches: comboMatches, evalLine: evalLine, combosFor: combosFor, upgrades: upgrades,
     nearMisses: nearMisses, fillers: fillers, specialTeams: specialTeams, rating: rating, evaluate: evaluate,
-    lineupPlayers: lineupPlayers, key: key, GROUPS: GROUPS };
+    lineupPlayers: lineupPlayers, key: key, GROUPS: GROUPS, sidesD: sidesD, mixedPair: mixedPair };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -280,7 +280,7 @@ body.sheet-open{overflow:hidden}
 (function(){
 'use strict';
 var D=null, byKey={}, byName={}, teamName={}, typeName={};
-var S={cap:'', ap:'', coach:'', strict:true, prio:'bal', seenNewer:0, captain:'auto', useRating:false,
+var S={cap:'', ap:'', coach:'', strict:true, dHand:'', prio:'bal', seenNewer:0, captain:'auto', useRating:false,
        weights:{skating:1,shooting:1,hands:1,checking:1,defense:1}, lastSeen:'', prevSeen:''};
 var VD={}, VER='', V={owned:[],locks:{},bans:{},lineups:[],xfOn:{}};  /* Daten je NHL-Version */
 var SHARED=null;   /* geteilter Kader aus einem Link: nur ansehen */
@@ -344,7 +344,7 @@ var IC={
 function owned(){return (SHARED||V.owned).map(function(k){return byKey[k];}).filter(Boolean);}
 function isOwned(c){return (SHARED||V.owned).indexOf(key(c))>=0;}
 function valFn(){return S.useRating?HUT.rating(S.weights):function(p){return p.ovr;};}
-function opts(){return {coach:S.coach,strict:S.strict,cap:parseFloat(S.cap)||0,w:PRIO[S.prio]||PRIO.bal,val:valFn(),locks:SHARED?{}:V.locks,bans:SHARED?{}:V.bans,captain:S.captain};}
+function opts(){return {coach:S.coach,strict:S.strict,cap:parseFloat(S.cap)||0,w:PRIO[S.prio]||PRIO.bal,val:valFn(),locks:SHARED?{}:V.locks,bans:SHARED?{}:V.bans,captain:S.captain,dHand:S.dHand};}
 function result(){ if(!RES) RES=HUT.optimize(D,owned(),opts()); return RES; }
 function newSince(){
   if(S.prevSeen) return S.prevSeen;
@@ -557,9 +557,10 @@ function plHtml(p,top,boost){
   return '<button class="pl" data-card="'+key(p)+'" aria-label="Details zu '+esc(nice(p.n))+'"><div class="img"><div class="ovr">'+p.ovr+'</div>'+img(p)+(boost?'<span class="boost">+'+boost+'</span>':'')+'</div>'+
     '<div class="n">'+esc(nice(p.n))+'</div><div class="v">'+esc(top)+' · '+money(p.sal||0)+'</div></button>';
 }
-function lineHtml(title,l){
+function lineHtml(title,l,isD){
+  var ps=isD?HUT.sidesD(l.players,S.dHand):l.players;
   return '<div class="line"><div class="linehead"><strong>'+title+'</strong><div class="pills">'+pillsFor(l.boosts)+'</div></div>'+
-    '<div class="players">'+l.players.map(function(p){return plHtml(p,p.pos,l.boosts.overall);}).join('')+'</div>'+
+    '<div class="players">'+ps.map(function(p,j){return plHtml(p,isD?(j?'RV':'LV')+' · '+(p.hand==='L'?'Links':'Rechts'):p.pos,l.boosts.overall);}).join('')+'</div>'+
     l.active.map(function(c){return '<div class="combo">'+(c.src==='Coach'?'Coach: ':'')+c.slots.map(function(s){return esc(slotText(s));}).join(' + ')+' → '+boostLabel(c)+'</div>';}).join('')+
     '</div>';
 }
@@ -590,7 +591,7 @@ function overviewHtml(r){
     h+='<div class="blk"><div class="side">Angriff '+(i+1)+'</div><div><div class="slots c3">'+(function(ps){return FP.map(function(pos,j){return slotHtml(ps[j],pos,f&&f.boosts.overall);});})(f?arrange(f.players,['LW','C','RW']):[]).join('')+'</div>'+(f?bonusMini(f.boosts):'<div class="bon"></div>')+'</div></div>';
     if(i<3){
       var d=r.defense[i];
-      h+='<div class="blk"><div class="side">Verteidigung '+(i+1)+'</div><div><div class="slots c2">'+(function(ps){return DP.map(function(pos,j){return slotHtml(ps[j],pos,d&&d.boosts.overall);});})(d?arrange(d.players,['LD','RD']):[]).join('')+'</div>'+(d?bonusMini(d.boosts):'<div class="bon"></div>')+'</div></div>';
+      h+='<div class="blk"><div class="side">Verteidigung '+(i+1)+'</div><div><div class="slots c2">'+(function(ps){return DP.map(function(pos,j){return slotHtml(ps[j],pos,d&&d.boosts.overall);});})(d?HUT.sidesD(d.players,S.dHand):[]).join('')+'</div>'+(d?bonusMini(d.boosts):'<div class="bon"></div>')+'</div></div>';
     }else{
       h+='<div class="blk"><div class="side">Goalies</div><div><div class="slots c2">'+slotHtml(r.goalies[0],'STARTER')+slotHtml(r.goalies[1],'ERSATZ')+'</div><div class="bon"></div></div></div>';
     }
@@ -665,7 +666,7 @@ function viewReihen(){
   if(UI.rv!=='det'){ h+=overviewHtml(r); }
   else{
   if(r.forwards.length){h+='<h2>Sturm</h2><div class="list">'+r.forwards.map(function(l,i){return lineHtml((i+1)+'. Reihe',l);}).join('')+'</div>';}
-  if(r.defense.length){h+='<h2>Abwehr</h2><div class="list">'+r.defense.map(function(l,i){return lineHtml((i+1)+'. Paar',l);}).join('')+'</div>';}
+  if(r.defense.length){h+='<h2>Abwehr</h2><div class="list">'+r.defense.map(function(l,i){return lineHtml((i+1)+'. Paar',l,true);}).join('')+'</div>';}
   if(r.goalies.length){h+='<h2>Tor</h2><div class="line"><div class="players">'+r.goalies.map(function(p,i){return plHtml(p,i?'Backup':'Starter');}).join('')+'</div></div>';}
   }
   var inLine={}; HUT.lineupPlayers(r).forEach(function(p){inLine[key(p)]=1;});
@@ -739,6 +740,7 @@ function viewSetup(){
    '<div class="field"><label for="s-captain">Captain</label><select id="s-captain">'+opt('auto','Automatisch wählen',S.captain)+opt('','Ohne Captain rechnen',S.captain)+caps.map(function(c){return opt(key(c),c.n+' ('+c.ovr+' '+c.ctn+')',S.captain);}).join('')+'</select><small>'+(D.captains&&D.captains.length?D.captains.length+' Captain-Karten geben einen Bonus, wenn genug Spieler aus ihren Zielteams aufgestellt sind. Du hast '+caps.length+' davon.':'In den Daten sind keine Captain-Karten.')+'</small></div>'+
    '<div class="field"><label for="s-prio">Priorität</label><select id="s-prio">'+Object.keys(PRIO).map(function(k){return opt(k,PRIO[k].label,S.prio);}).join('')+'</select></div>'+
    '<label class="check"><input type="checkbox" id="s-strict"'+(S.strict?' checked':'')+'> Feste Positionen (LW, C, RW und LD, RD)</label>'+
+   '<div class="field"><label for="s-dhand">Verteidiger-Seiten</label><select id="s-dhand">'+opt('','Nach Kartenposition (LD links, RD rechts)',S.dHand)+opt('off','Gegenseite für One-Timer (Linksschütze rechts)',S.dHand)+opt('on','Eigene Seite (Linksschütze links)',S.dHand)+'</select><small>Mit einer Seiten-Einstellung verteilt die App die Verteidiger nach Schusshand statt nach Kartenposition und bevorzugt Paare aus einem Links- und einem Rechtsschützen.</small></div>'+
    '<h2>Eigene Bewertung</h2><label class="check"><input type="checkbox" id="s-rate"'+(S.useRating?' checked':'')+'> Spieler nach meinen Gewichten bewerten statt nach OVR</label>';
   if(S.useRating) h+='<div class="statgrid" style="margin-bottom:12px">'+Object.keys(GRP).map(function(g){return '<label for="w-'+g+'">'+GRP[g].toUpperCase()+'<select id="w-'+g+'" data-w="'+g+'">'+[[0,'egal'],[1,'normal'],[2,'wichtig'],[3,'sehr wichtig']].map(function(o){return opt(o[0],o[1],S.weights[g]);}).join('')+'</select></label>';}).join('')+'</div><p class="small mute">Der Optimierer und der Upgrade-Finder nutzen dann diesen Wert. Goalies bleiben bei OVR.</p>';
   h+='<p class="note">So rechnet die App: Ein Combo greift, wenn jede Anforderung von einem anderen Spieler der Reihe erfüllt wird. Alle passenden Combos einer Reihe zählen zusammen, +OVR gilt für jeden Spieler der Reihe. Kein Spieler steht doppelt in der Aufstellung.</p>'+
@@ -1025,6 +1027,7 @@ view.addEventListener('change',function(e){
   else if(t.id==='s-captain'){S.captain=t.value; save();}
   else if(t.id==='s-prio'){S.prio=t.value; UI.up=null; save();}
   else if(t.id==='s-strict'){S.strict=t.checked; UI.up=null; save();}
+  else if(t.id==='s-dhand'){S.dHand=t.value; UI.up=null; save();}
   else if(t.id==='s-rate'){S.useRating=t.checked; UI.up=null; save(); viewSetup();}
   else if(d.w){S.weights[d.w]=+t.value; UI.up=null; save();}
   else if(d.xf){ if(t.checked) V.xfOn[d.xf]=1; else delete V.xfOn[d.xf]; UI.dAp=true; var keep=RES; save(); RES=keep; viewReihen(); }

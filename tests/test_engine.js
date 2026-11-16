@@ -63,4 +63,13 @@ const re=H.evaluate(data,saved,{w:W},byKey); ok(Math.abs(re.totals.raw-r.totals.
 // big roster timing
 const big=[...pick('LW',12),...pick('C',14),...pick('RW',12),...pick('LD',10),...pick('RD',10),...pick('G',4)];
 t=Date.now(); const rbig=H.optimize(data,big,{strict:false,cap:0,coach:data.coaches[0].name,w:W}); ok(rbig.forwards.length===4,'big roster, free positions ('+(Date.now()-t)+' ms)');
+// Verteidiger nach Schusshand
+const dOwned=owned.filter(c=>c.k==='s'&&(c.pos==='LD'||c.pos==='RD'));
+const rh=H.optimize(data,owned,{strict:true,w:W,dHand:'off'});
+const mixedBefore=r.defense.filter(H.mixedPair).length, mixedAfter=rh.defense.filter(H.mixedPair).length;
+ok(rh.defense.length===3&&mixedAfter>=mixedBefore,'hand mode keeps 3 pairs and prefers mixed hands ('+mixedBefore+' -> '+mixedAfter+')');
+const pair=rh.defense.find(H.mixedPair);
+if(pair){ const s1=H.sidesD(pair.players,'off'); ok(s1[0].hand==='R'&&s1[1].hand==='L','off-hand: right shooter left, left shooter right');
+  const s2=H.sidesD(pair.players,'on'); ok(s2[0].hand==='L'&&s2[1].hand==='R','on-hand: left shooter left'); }
+const same=dOwned.filter(c=>c.hand==='L').slice(0,2); if(same.length===2){ const s3=H.sidesD(same,'off'); ok(s3.length===2&&s3[0]&&s3[1],'same-hand pair still placed'); }
 process.exit(fail?1:0);
