@@ -265,6 +265,18 @@ body.sheet-open{overflow:hidden}
 .legend{font-size:11.5px;color:var(--faint);margin:6px 0 0}
 .gm .star{position:absolute;top:-1.4cqw;right:-1cqw;width:4.2cqw;height:4.8cqw;z-index:2;filter:drop-shadow(0 .4cqw .6cqw rgba(0,0,0,.6))}
 /* Bedingungen fuer Captain- und Trainer-Boni */
+/* Vorschlag: neue Reihe mit Partnern und Reihenbonus vorher/nachher */
+.sug-line{display:flex;gap:6px;margin-top:8px}
+.sug-line .m{width:44px;flex:none;background:none;border:0;padding:0;color:inherit;text-align:center}
+.sug-line .m .img{position:relative;aspect-ratio:804/1128;border-radius:4px;overflow:hidden;background:var(--surface2);display:grid;place-items:center}
+.sug-line .m .img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.sug-line .m .img .ovr{font-size:15px}
+.sug-line .m.new .img{outline:2px solid var(--sal);outline-offset:1px}
+.sug-line .m small{display:block;font-size:10px;line-height:1.15;color:var(--mute);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sug-line .m.new small{color:var(--sal);font-weight:600}
+.sug-bon{display:grid;grid-template-columns:auto 1fr;gap:4px 8px;align-items:center;margin-top:8px;font-size:12px;color:var(--faint)}
+.sug-bon .pills{gap:4px}
+.sug-bon .pill{font-size:11.5px;padding:1px 8px}
 .req{display:grid;grid-template-columns:40px 1fr auto;gap:12px;align-items:start;padding:12px 0;border-top:1px solid var(--line)}
 .req:first-child{border-top:0;padding-top:2px}
 .req .ic{width:40px;height:40px;border-radius:10px;background:var(--surface2);display:grid;place-items:center}
@@ -842,18 +854,24 @@ function upHtml(){
   if(UI.up==='run') return h+'<p class="mute">Rechne alle Karten durch …</p>';
   if(!UI.up) return h+'<p class="small mute">'+(bonus?'Sucht Karten, die in deiner Aufstellung neue Combos oder den Captain-Bonus freischalten, ohne viel schwächer zu sein als der Spieler, den sie ersetzen. Oben stehen die Karten mit den meisten neuen Boni, bei gleichem Bonus die mit niedrigerer OVR, weil die meist leichter zu bekommen sind. Je Spieler steht nur eine Version da.':'Prüft jede Karte, die du nicht hast: Wo würde sie in deiner aktuellen Aufstellung am meisten bringen, mit allen Combos?')+'</p>';
   if(!UI.up.length) return h+'<p class="note">'+(bonus?'Keine Karte schaltet mit diesen Einstellungen einen neuen Bonus frei. Lass mehr Abstand zu oder heb die OVR-Grenze an.':'Keine einzelne Karte verbessert deine Aufstellung'+(result().capBase?' innerhalb des Caps':'')+'.')+'</p>';
+  var bp=function(b){ var p=[];
+    if(b&&b.overall) p.push('<span class="pill o">+'+b.overall+' GES</span>');
+    if(b&&b.ability_points) p.push('<span class="pill a">+'+b.ability_points+' FP</span>');
+    if(b&&b.salary) p.push('<span class="pill s">+'+String((+b.salary).toFixed(1)).replace('.',',')+' M$</span>');
+    return p.length?p.join(''):'<span class="pill n">kein Bonus</span>'; };
   return h+'<div class="list">'+UI.up.map(function(u){
-    var c=u.card, g=[];
-    if(u.gain.overall) g.push('<span class="pill o">'+(u.gain.overall>0?'+':'')+u.gain.overall+' GES</span>');
-    if(u.gain.ability_points) g.push('<span class="pill a">'+(u.gain.ability_points>0?'+':'')+u.gain.ability_points+' FP</span>');
-    if(u.gain.salary) g.push('<span class="pill s">'+(u.gain.salary>0?'+':'−')+String(Math.abs(u.gain.salary).toFixed(1)).replace('.',',')+' M$</span>');
-    if(u.capGain) g.push('<span class="pill a">Captain +'+u.capGain+'</span>');
+    var c=u.card;
     var diff=u.diff!=null?u.diff:(c.ovr-u.replaces.ovr), dtxt=Math.abs(diff)<0.05?'gleich stark':(diff>0?'+':'−')+String(Math.abs(Math.round(diff*10)/10)).replace('.',',')+' OVR';
-    var why=u.combos&&u.combos.length?'<div class="small mute" style="margin-top:4px">Neu: '+u.combos.map(function(x){return esc(x.slots.map(function(sl){return sl.map(function(r){return r.name;}).join(' & ');}).join(' + '));}).filter(function(v,i,a){return a.indexOf(v)===i;}).join(' · ')+'</div>':'';
-    return '<div class="row"><div class="rowhead">'+artHtml(c)+
-      '<button class="open" data-card="'+key(c)+'"><span class="nm">'+esc(nice(c.n))+'</span>'+sub(c)+
+    var ps=u.line?(u.group==='defense'?HUT.sidesD(u.line,S.dHand):arrange(u.line,['LW','C','RW'])):[];
+    var lineHtml2=ps.length?'<div class="sug-line">'+ps.map(function(p){var isNew=p===c;
+      return '<span class="m'+(isNew?' new':'')+'" data-card="'+key(p)+'"><span class="img"><span class="ovr">'+p.ovr+'</span>'+img(p)+'</span><small>'+(isNew?'neu':esc(nice(p.n).split(' ').slice(-1)[0]))+'</small></span>';}).join('')+'</div>':'';
+    var cap=u.capGain?'<span class="pill a">Captain +'+u.capGain+' FP</span>':'';
+    return '<div class="row"><div class="rowhead" style="align-items:start">'+artHtml(c)+
+      '<div class="open" style="cursor:default"><button class="open" data-card="'+key(c)+'" style="padding:0"><span class="nm">'+esc(nice(c.n))+'</span>'+sub(c)+'</button>'+
       '<span class="small">statt '+esc(nice(u.replaces.n))+' ('+u.replaces.ovr+') · '+esc(u.where)+' · <span style="color:'+(diff<0?'var(--accent2)':'var(--sal)')+'">'+dtxt+'</span></span>'+
-      '<span class="pills" style="margin-top:2px">'+(bonus?'':'<span class="pill n">+'+u.delta.toFixed(1)+' Punkte</span>')+g.join('')+'</span>'+why+'</button>'+
+      lineHtml2+
+      '<div class="sug-bon"><span>vorher</span><span class="pills">'+bp(u.before)+'</span><span style="color:var(--ice);font-weight:600">nachher</span><span class="pills">'+bp(u.after)+cap+'</span></div>'+
+      (bonus?'':'<span class="pills" style="margin-top:6px"><span class="pill n">+'+u.delta.toFixed(1)+' Punkte</span></span>')+'</div>'+
       '<button class="act" data-tg="'+key(c)+'" aria-label="'+esc(nice(c.n))+' zum Kader hinzufügen">'+IC.plus+'</button></div></div>';
   }).join('')+'</div><p class="small mute" style="margin-top:8px">'+(bonus?'Gerechnet wird je Karte der beste einzelne Tausch in deiner aktuellen Aufstellung, mit Trainer- und Captain-Boni.':'Punkte = Zugewinn in der Wertung des Optimierers (1 Punkt entspricht 1 OVR bei einem Spieler). Gerechnet wird je Karte der beste einzelne Tausch. Captain-Boni bleiben hier außen vor.')+'</p>';
 }

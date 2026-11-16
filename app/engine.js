@@ -364,7 +364,7 @@
               var d = contrib(nl, w) - contrib(l, w);
               if ((nl.sal - nl.boosts.salary) - (l.sal - l.boosts.salary) > room + 1e-9) continue;
               if (d > 1e-9 && (!best || d > best.delta)) {
-                best = { card: c, delta: d, replaces: out0, where: (li + 1) + g.label,
+                best = { card: c, delta: d, replaces: out0, where: (li + 1) + g.label, line: np, before: l.boosts, after: nl.boosts, group: g.key,
                   gain: { overall: nl.boosts.overall - l.boosts.overall, ability_points: nl.boosts.ability_points - l.boosts.ability_points, salary: nl.boosts.salary - l.boosts.salary } };
               }
             }
@@ -417,7 +417,8 @@
             }
             if (bonus <= 1e-9) continue;
             var newCombos = nl.active.filter(function (x) { return l.active.indexOf(x) < 0 && !l.active.some(function (y) { return y.key === x.key; }); });
-            var cand = { card: c, replaces: o, where: (li + 1) + g.label, gain: gain, capGain: capGain, bonus: bonus, diff: val(c) - val(o), combos: newCombos };
+            var cand = { card: c, replaces: o, where: (li + 1) + g.label, gain: gain, capGain: capGain, bonus: bonus, diff: val(c) - val(o), combos: newCombos,
+              line: np, before: l.boosts, after: nl.boosts, group: g.key };
             if (!best || cand.bonus > best.bonus + 1e-9 || (Math.abs(cand.bonus - best.bonus) < 1e-9 && cand.diff > best.diff)) best = cand;
           }
         });
