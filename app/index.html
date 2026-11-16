@@ -274,6 +274,11 @@ body.sheet-open{overflow:hidden}
 .sug-line .m.new .img{outline:2px solid var(--sal);outline-offset:1px}
 .sug-line .m small{display:block;font-size:10px;line-height:1.15;color:var(--mute);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sug-line .m.new small{color:var(--sal);font-weight:600}
+.sug-line .sep{width:1px;align-self:stretch;margin:2px 4px 18px;background:var(--line2)}
+.sug-line .m.out .img{outline:2px solid var(--accent);outline-offset:1px}
+.sug-line .m.out .img img{filter:grayscale(.85) brightness(.6)}
+.sug-line .m.out .img:after{content:"";position:absolute;left:-10%;right:-10%;top:50%;height:2px;background:var(--accent);transform:rotate(-55deg)}
+.sug-line .m.out small{color:var(--accent2);font-weight:600}
 .sug-bon{display:grid;grid-template-columns:auto 1fr;gap:4px 8px;align-items:center;margin-top:8px;font-size:12px;color:var(--faint)}
 .sug-bon .pills{gap:4px}
 .sug-bon .pill{font-size:11.5px;padding:1px 8px}
@@ -864,7 +869,8 @@ function upHtml(){
     var diff=u.diff!=null?u.diff:(c.ovr-u.replaces.ovr), dtxt=Math.abs(diff)<0.05?'gleich stark':(diff>0?'+':'−')+String(Math.abs(Math.round(diff*10)/10)).replace('.',',')+' OVR';
     var ps=u.line?(u.group==='defense'?HUT.sidesD(u.line,S.dHand):arrange(u.line,['LW','C','RW'])):[];
     var lineHtml2=ps.length?'<div class="sug-line">'+ps.map(function(p){var isNew=p===c;
-      return '<span class="m'+(isNew?' new':'')+'" data-card="'+key(p)+'"><span class="img"><span class="ovr">'+p.ovr+'</span>'+img(p)+'</span><small>'+(isNew?'neu':esc(nice(p.n).split(' ').slice(-1)[0]))+'</small></span>';}).join('')+'</div>':'';
+      return '<span class="m'+(isNew?' new':'')+'" data-card="'+key(p)+'"><span class="img"><span class="ovr">'+p.ovr+'</span>'+img(p)+'</span><small>'+(isNew?'neu':esc(nice(p.n).split(' ').slice(-1)[0]))+'</small></span>';}).join('')+
+      '<span class="sep" aria-hidden="true"></span><span class="m out" data-card="'+key(u.replaces)+'" title="fällt weg"><span class="img"><span class="ovr">'+u.replaces.ovr+'</span>'+img(u.replaces)+'</span><small>raus: '+esc(nice(u.replaces.n).split(' ').slice(-1)[0])+'</small></span></div>':'';
     var cap=u.capGain?'<span class="pill a">Captain +'+u.capGain+' FP</span>':'';
     return '<div class="row"><div class="rowhead" style="align-items:start">'+artHtml(c)+
       '<div class="open" style="cursor:default"><button class="open" data-card="'+key(c)+'" style="padding:0"><span class="nm">'+esc(nice(c.n))+'</span>'+sub(c)+'</button>'+
