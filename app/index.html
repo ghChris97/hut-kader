@@ -312,6 +312,10 @@ details.sg .field{margin-bottom:12px}
 .cmp .l{text-align:right} .cmp .m{color:var(--faint);font:600 11px/1.4 var(--body);letter-spacing:.06em;text-align:center}
 .cmp .win{color:var(--ovr);font-weight:700}
 .cmphead{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;text-align:center}
+.cmphead>div{min-width:0}
+.cmphead .logos,.cmphead .meta{justify-content:center;flex-wrap:wrap}
+.cmphead .lgi em{display:none}
+.cmphead .lbempty{width:min(150px,100%);margin:0 auto}
 .cmphead img{width:min(150px,100%);aspect-ratio:804/1128;border-radius:10px;background:var(--surface2);cursor:pointer}
 .imprt{display:grid;grid-template-columns:auto 46px 1fr;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
 .imprt .art{width:46px}
@@ -1279,8 +1283,7 @@ function viewReihen(){
 function grpAvg(c,g){var idx=HUT.GROUPS[g], s=0; idx.forEach(function(i){s+=c.a[i];}); return s/idx.length;}
 function cmpHtml(){
   var a=byKey[UI.cmp[0]], b=byKey[UI.cmp[1]];
-  if(!a&&!b) return '<p class="small mute">Öffne eine Karte unter Karten oder Kader und tippe auf „Vergleichen". Zwei Karten stehen dann hier nebeneinander.</p>';
-  var head=function(c,i){return c?'<div><div data-card="'+key(c)+'">'+img(c)+'</div><div class="nm" style="margin:6px 0 4px">'+esc(nice(c.n))+'</div>'+sub(c)+'<button class="chip" data-cmpx="'+i+'" style="margin-top:8px">Entfernen</button></div>':'<div class="center mute small" style="border:1px dashed var(--line2);border-radius:12px">Zweite Karte wählen:<br>Karte öffnen und „Vergleichen" tippen.</div>';};
+  var head=function(c,i){return c?'<div><div data-card="'+key(c)+'">'+img(c)+'</div><div class="nm" style="margin:6px 0 4px">'+esc(nice(c.n))+'</div>'+sub(c)+'<button class="chip" data-cmpx="'+i+'" style="margin-top:8px">Entfernen</button></div>':'<button class="lbempty" data-cmppick="'+i+'"><span>+</span>Karte '+(i+1)+'</button>';};
   var h='<div class="cmphead">'+head(a,0)+head(b,1)+'</div>';
   if(!a||!b) return h;
   if(a.k!==b.k) return h+'<p class="note warn">Feldspieler und Goalies haben unterschiedliche Werte und lassen sich nicht vergleichen.</p>';
@@ -1334,7 +1337,7 @@ function upHtml(){
   }).join('')+'</div><p class="small mute" style="margin-top:8px">'+(bonus?'Gerechnet wird je Karte der beste einzelne Tausch in deiner aktuellen Aufstellung, mit Trainer- und Captain-Boni.':'Punkte = Zugewinn in der Wertung des Optimierers (1 Punkt entspricht 1 OVR bei einem Spieler). Gerechnet wird je Karte der beste einzelne Tausch. Captain-Boni bleiben hier außen vor.')+'</p>';
 }
 function viewAnalyse(){
-  var an=UI.an||'pack', tabs=[['pack','Auswahl-Pack','Spieler aus einem Auswahl-Pack eintragen (Karte oder Foto). Die App stellt deine Aufstellung mit jedem einzeln neu auf und sagt, wer am meisten bringt.'],['lb','Baukasten','Eine Reihe frei zusammenstellen und beste Partner finden'],['up','Neue Karten','Welche Karten deine Aufstellung verbessern'],['cmp','Vergleich','Karten Wert für Wert vergleichen']];
+  var an=UI.an||'pack', tabs=[['pack','Auswahl-Pack','Spieler aus einem Auswahl-Pack eintragen (Karte oder Foto). Die App stellt deine Aufstellung mit jedem einzeln neu auf und sagt, wer am meisten bringt.'],['lb','Baukasten','Eine Reihe frei zusammenstellen und beste Partner finden'],['up','Neue Karten','Welche Karten deine Aufstellung verbessern'],['cmp','Vergleich','Zwei Karten Wert für Wert vergleichen. Tippe auf ein Feld und wähle eine Karte.']];
   var cur=tabs.filter(function(t){return t[0]===an;})[0]||tabs[0];
   var h=sharedHtml()+'<div class="antabs" role="tablist">'+tabs.map(function(t){return '<button role="tab" data-an="'+t[0]+'" aria-selected="'+(t[0]===cur[0])+'">'+t[1]+'</button>';}).join('')+'</div><p class="anlead">'+cur[2]+'</p>';
   h+=cur[0]==='pack'?pkHtml():cur[0]==='lb'?lbHtml():cur[0]==='up'?upHtml():cmpHtml();
@@ -1754,11 +1757,13 @@ document.addEventListener('click',function(e){
     ks.forEach(function(k){var i=V.owned.indexOf(k); if(i>=0){V.owned.splice(i,1); delete V.locks[k]; delete V.bans[k];}});
     UI.sel=null; UI.up=null; RES=null; save(); render(); toast(ks.length+' entfernt'); return; }
   if(d.cmp){
+    UI.cmp=UI.cmp.filter(Boolean);
     if(UI.cmp.indexOf(d.cmp)<0){ if(UI.cmp.length>=2) UI.cmp.shift(); UI.cmp.push(d.cmp); }
-    if(UI.cmp.length===2){closeCard(); setTimeout(function(){location.hash='#analyse';},50);} else toast('Gemerkt. Jetzt die zweite Karte öffnen.');
+    if(UI.cmp.length===2){closeCard(); UI.an='cmp'; setTimeout(function(){location.hash='#analyse';},50);} else toast('Gemerkt. Jetzt die zweite Karte öffnen.');
     return;
   }
-  if(d.cmpx!==undefined){UI.cmp.splice(+d.cmpx,1); viewAnalyse(); return;}
+  if(d.cmpx!==undefined){UI.cmp[+d.cmpx]=null; viewAnalyse(); return;}
+  if(d.cmppick!==undefined){ var ci=+d.cmppick; openCardPick(0,function(k){ UI.cmp[ci]=k; viewAnalyse(); },true); return; }
   if(d.lock){ if(V.locks[d.lock]) delete V.locks[d.lock]; else {V.locks[d.lock]=1; delete V.bans[d.lock];} save(); render(); refreshSheet(); toast(V.locks[d.lock]?'Fixiert: spielt immer':'Fixierung gelöst'); return; }
   if(d.ban){ if(V.bans[d.ban]) delete V.bans[d.ban]; else {V.bans[d.ban]=1; delete V.locks[d.ban];} save(); render(); refreshSheet(); toast(V.bans[d.ban]?'Gesperrt: spielt nie':'Sperre gelöst'); return; }
   if(d.pos!==undefined){UI.pos=d.pos; UI.limit=40; viewKarten(); return;}
