@@ -117,6 +117,7 @@ p{margin:0 0 10px}
 .pkr{display:grid;grid-template-columns:58px 1fr;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
 .pkr.best{box-shadow:inset 3px 0 0 var(--ovr);padding-left:8px}
 .pkrn b{font-size:15px} .pkrs{font-size:12.5px;color:var(--mute);margin-top:3px}
+.pkrs .dn{color:#ff6b62}
 .pkrs b.up{color:var(--sal)} .pkrs b.dn{color:#ff6b62}
 .pkimg{width:34px;aspect-ratio:804/1128;flex:none;overflow:hidden;background:var(--surface2)}
 .pkimg img{width:100%;height:100%;object-fit:cover;display:block}
@@ -769,7 +770,7 @@ function fitHtml(k){
   var inA={}, inB={}; HUT.lineupPlayers(base).forEach(function(p){inA[key(p)]=p;}); HUT.lineupPlayers(r2).forEach(function(p){inB[key(p)]=p;});
   var out=Object.keys(inA).filter(function(x){return !inB[x];}).map(function(x){return inA[x];});
   var t1=base.totals, t2=r2.totals, d=function(v,dig,unit){ var s=(v>0?'+':'')+(dig?v.toFixed(dig):Math.round(v)); return '<b class="'+(v>0.0001?'up':v<-0.0001?'dn':'')+'">'+s.replace('.',',')+(unit||'')+'</b>'; };
-  var title=at.t==='f'?(at.i+1)+'. Reihe':at.t==='d'?(at.i+1)+'. Paar':(at.i?'Backup':'Starting')+'-Goalie';
+  var title=at.t==='f'?(at.i+1)+'. Sturmreihe':at.t==='d'?(at.i+1)+'. Verteidigungsreihe':(at.i?'Backup':'Starting')+'-Goalie';
   var h='<h3 class="fit-h">So passt '+esc(nice(c.n))+' rein</h3>'+
     '<div class="rstat"><div class="o">'+d(t2.avg-t1.avg,1)+'<span>Ø OVR</span></div><div class="a">'+d(t2.ap-t1.ap)+'<span>AP</span></div><div class="s">'+d((t2.sal-t1.sal),1,'M')+'<span>Gehalt</span></div><div class="o">'+d(t2.boostOvr-t1.boostOvr)+'<span>OVR-Boni</span></div></div>'+
     '<p class="small">Landet in: <b>'+title+'</b>'+(out.length?' · raus: '+out.map(function(p){return esc(nice(p.n))+' ('+p.ovr+')';}).join(', '):'')+'</p>';
@@ -1272,13 +1273,13 @@ function viewReihen(){
     '<div class="o"><b>+'+t.boostOvr+'</b><span>OVR-Boni</span></div>'+
     (capt?'<div class="'+(capt.active?'a':'bad')+'"><b>C '+capt.count+'/'+capt.need+'</b><span>'+(capt.active?'aktiv':'aus')+'</span></div>':'')+
     '</div>';
-  var miss=[]; if(r.missing.f) miss.push(r.missing.f+' Sturmreihe'+(r.missing.f>1?'n':'')); if(r.missing.d) miss.push(r.missing.d+' Abwehrpaar'+(r.missing.d>1?'e':'')); if(r.missing.g) miss.push(r.missing.g+' Goalie'+(r.missing.g>1?'s':''));
+  var miss=[]; if(r.missing.f) miss.push(r.missing.f+' Sturmreihe'+(r.missing.f>1?'n':'')); if(r.missing.d) miss.push(r.missing.d+' Verteidigungsreihe'+(r.missing.d>1?'n':'')); if(r.missing.g) miss.push(r.missing.g+' Goalie'+(r.missing.g>1?'s':''));
   h+='<div class="rtop"><div class="seg" role="group" aria-label="Ansicht"><button id="rv-ov" aria-pressed="'+(UI.rv!=='det')+'">Übersicht</button><button id="rv-det" aria-pressed="'+(UI.rv==='det')+'">Detail</button></div>'+
     (UI.rv!=='det'?'<button class="btn ghost sm icon" id="gm-full" aria-label="Vollbild"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>':'')+'</div>';
   if(UI.rv!=='det'){ h+=overviewHtml(r); }
   else{
-  if(r.forwards.length){h+='<h2>Sturm</h2><div class="list">'+r.forwards.map(function(l,i){return lineHtml((i+1)+'. Reihe',l);}).join('')+'</div>';}
-  if(r.defense.length){h+='<h2>Abwehr</h2><div class="list">'+r.defense.map(function(l,i){return lineHtml((i+1)+'. Paar',l,true);}).join('')+'</div>';}
+  if(r.forwards.length){h+='<h2>Sturm</h2><div class="list">'+r.forwards.map(function(l,i){return lineHtml((i+1)+'. Sturmreihe',l);}).join('')+'</div>';}
+  if(r.defense.length){h+='<h2>Abwehr</h2><div class="list">'+r.defense.map(function(l,i){return lineHtml((i+1)+'. Verteidigungsreihe',l,true);}).join('')+'</div>';}
   if(r.goalies.length){h+='<h2>Tor</h2><div class="line"><div class="players">'+r.goalies.map(function(p,i){return plHtml(p,i?'Backup':'Starter');}).join('')+'</div></div>';}
   }
   if(r.capFailed) h+='<p class="note warn">Mit diesem Kader bleibt keine vollständige Aufstellung unter dem Cap. Angezeigt wird die stärkste Aufstellung ohne Cap.</p>';
@@ -1406,9 +1407,9 @@ function pkRank(){
     var r2=HUT.optimize(D,owned().concat([c]),opts()), at=findSlot(r2,k), t1=base.totals, t2=r2.totals;
     var inA={}, inB={}; HUT.lineupPlayers(base).forEach(function(p){inA[key(p)]=p;}); HUT.lineupPlayers(r2).forEach(function(p){inB[key(p)]=p;});
     var outP=Object.keys(inA).filter(function(x){return !inB[x];}).map(function(x){return inA[x];});
-    out.push({c:c,at:at,out:outP,d:t2.raw-t1.raw,avg:t2.avg-t1.avg,ap:t2.ap-t1.ap,bo:t2.boostOvr-t1.boostOvr});
+    out.push({c:c,at:at,out:outP,d:t2.raw-t1.raw,avg:t2.avg-t1.avg,ap:t2.ap-t1.ap,bo:t2.boostOvr-t1.boostOvr,capLost:!!(t1.captain&&t1.captain.active&&!(t2.captain&&t2.captain.active))});
   });
-  out.sort(function(a,b){return b.d-a.d;});
+  out.sort(function(a,b){return (a.own?1:0)-(b.own?1:0)||b.d-a.d;});
   return out;
 }
 function pkHtml(){
@@ -1421,10 +1422,10 @@ function pkHtml(){
   if(st.res){
     h+=st.res.map(function(x,i){
       var c=x.c, k=key(c), best=i===0&&x.d>0;
-      var where=x.own?'Hast du schon':!x.at?'Würde nicht spielen':(x.at.t==='f'?(x.at.i+1)+'. Reihe':x.at.t==='d'?(x.at.i+1)+'. Paar':(x.at.i?'Backup':'Starting')+'-Goalie')+(x.out&&x.out.length?' statt '+x.out.map(function(p){return esc(nice(p.n))+' ('+p.ovr+')';}).join(', '):' · füllt eine freie Stelle');
+      var where=x.own?'Hast du schon':!x.at?'Würde nicht spielen':(x.at.t==='f'?(x.at.i+1)+'. Sturmreihe':x.at.t==='d'?(x.at.i+1)+'. Verteidigungsreihe':(x.at.i?'Backup':'Starting')+'-Goalie')+(x.out&&x.out.length?' statt '+x.out.map(function(p){return esc(nice(p.n))+' ('+p.ovr+')';}).join(', '):' · füllt eine freie Stelle');
       var dd=function(v,dig){var s=(v>0?'+':'')+(dig?v.toFixed(dig):Math.round(v)); return '<b class="'+(v>0.0001?'up':v<-0.0001?'dn':'')+'">'+s.replace('.',',')+'</b>';};
       return '<div class="pkr'+(best?' best':'')+'"><button class="mc" data-card="'+k+'">'+img(c)+'</button><div class="pkrt"><div class="pkrn">'+(best?'<span class="recl">Empfehlung</span> ':'')+'<b>'+esc(nice(c.n))+'</b> <span class="mute">'+c.ovr+' · '+esc(c.pos)+'</span></div>'+
-        '<div class="small">'+where+'</div>'+(x.own||!x.at?'':'<div class="pkrs">Ø OVR '+dd(x.avg,1)+' · AP '+dd(x.ap)+' · OVR-Boni '+dd(x.bo)+'</div>')+'</div></div>';
+        '<div class="small">'+where+'</div>'+(x.own||!x.at?'':'<div class="pkrs">Ø OVR '+dd(x.avg,1)+' · AP '+dd(x.ap)+' · OVR-Boni '+dd(x.bo)+(x.capLost?'<br><span class="dn">Captain-Bonus fällt weg</span>':'')+'</div>')+'</div></div>';
     }).join('')+'<p class="small mute">Bewertet wird wie beim Optimierer (Priorität aus dem Setup): Stärke der Aufstellung, AP und Cap-Bonus. Tippe auf eine Karte für Details und „In meinen Reihen testen“.</p>';
   }
   return h;
@@ -1451,8 +1452,8 @@ function lbState(){ if(!UI.lb) UI.lb={t:'f',k:[null,null,null]}; return UI.lb; }
 function lbHtml(){
   var st=lbState(), isD=st.t==='d', n=isD?2:3, labs=isD?['LV','RV']:['LW','C','RW'];
   var r=owned().length?result():null;
-  var h='<div class="rtop"><div class="seg" role="group" aria-label="Art der Reihe"><button id="lb-f" aria-pressed="'+!isD+'">Sturmreihe</button><button id="lb-d" aria-pressed="'+isD+'">Verteidigerpaar</button></div></div>';
-  if(r){ var ls=isD?r.defense:r.forwards; if(ls.length) h+='<div class="chips scroll" style="margin-bottom:8px"><span class="small mute" style="align-self:center;flex:none">Übernehmen:</span>'+ls.map(function(l,i){return '<button class="chip" data-lbcopy="'+i+'">'+(i+1)+(isD?'. Paar':'. Reihe')+'</button>';}).join('')+'<button class="chip" data-lbcopy="-1">Leeren</button></div>'; }
+  var h='<div class="rtop"><div class="seg" role="group" aria-label="Art der Reihe"><button id="lb-f" aria-pressed="'+!isD+'">Sturmreihe</button><button id="lb-d" aria-pressed="'+isD+'">Verteidigungsreihe</button></div></div>';
+  if(r){ var ls=isD?r.defense:r.forwards; if(ls.length) h+='<div class="chips scroll" style="margin-bottom:8px"><span class="small mute" style="align-self:center;flex:none">Übernehmen:</span>'+ls.map(function(l,i){return '<button class="chip" data-lbcopy="'+i+'">'+(i+1)+(isD?'. Verteidigungsreihe':'. Sturmreihe')+'</button>';}).join('')+'<button class="chip" data-lbcopy="-1">Leeren</button></div>'; }
   h+='<div class="players lbslots">';
   for(var i=0;i<n;i++){
     var c=st.k[i]&&byKey[st.k[i]];

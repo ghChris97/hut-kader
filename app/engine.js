@@ -337,7 +337,7 @@
     ctx.owned.forEach(function (c) { have[key(c)] = 1; });
     lineupPlayers(res).forEach(function (p) { inLineup[p.n] = (inLineup[p.n] || 0) + 1; });
     var fAll = combosFor(data, 'forwards', opts.coach), dAll = combosFor(data, 'defense', opts.coach);
-    var groups = [{ key: 'forwards', lines: res.forwards, combos: fAll, pos: F_POS, label: '. Reihe' }, { key: 'defense', lines: res.defense, combos: dAll, pos: D_POS, label: '. Paar' }];
+    var groups = [{ key: 'forwards', lines: res.forwards, combos: fAll, pos: F_POS, label: '. Sturmreihe' }, { key: 'defense', lines: res.defense, combos: dAll, pos: D_POS, label: '. Verteidigungsreihe' }];
     var room = capBase > 0 ? capBase - (res.totals.sal - res.totals.salBoost) : Infinity;
     var minOvr = opts.minOvr || 0, maxO = opts.maxOvr || 0, out = [];
     data.cards.forEach(function (c) {
@@ -387,8 +387,8 @@
     var have = {}, inLineup = {};
     ctx.owned.forEach(function (c) { have[key(c)] = 1; });
     lineupPlayers(res).forEach(function (p) { inLineup[p.n] = 1; });
-    var groups = [{ key: 'forwards', lines: res.forwards, combos: combosFor(data, 'forwards', opts.coach), pos: F_POS, label: '. Reihe' },
-      { key: 'defense', lines: res.defense, combos: combosFor(data, 'defense', opts.coach), pos: D_POS, label: '. Paar' }];
+    var groups = [{ key: 'forwards', lines: res.forwards, combos: combosFor(data, 'forwards', opts.coach), pos: F_POS, label: '. Sturmreihe' },
+      { key: 'defense', lines: res.defense, combos: combosFor(data, 'defense', opts.coach), pos: D_POS, label: '. Verteidigungsreihe' }];
     var room = capBase > 0 ? capBase - (res.totals.sal - res.totals.salBoost) : Infinity;
     var cst = res.totals.captain, capTeams = cst ? captainTeams(cst.cap, data) : null;
     var out = [];
@@ -442,8 +442,8 @@
   /* Fast-Combos: Reihen, denen genau eine Anforderung fehlt. */
   function nearMisses(data, res, opts, limit) {
     var ctx = res.ctx, w = ctx.w, out = [], seen = {};
-    var groups = [{ lines: res.forwards, combos: combosFor(data, 'forwards', opts.coach), label: '. Reihe' },
-      { lines: res.defense, combos: combosFor(data, 'defense', opts.coach), label: '. Paar' }];
+    var groups = [{ lines: res.forwards, combos: combosFor(data, 'forwards', opts.coach), label: '. Sturmreihe' },
+      { lines: res.defense, combos: combosFor(data, 'defense', opts.coach), label: '. Verteidigungsreihe' }];
     groups.forEach(function (g) {
       g.lines.forEach(function (l, li) {
         g.combos.forEach(function (c) {
