@@ -67,7 +67,9 @@ p{margin:0 0 10px}
 .fchips{gap:6px}
 .fchips .chip{padding:6px 12px;font-size:13px}
 .fsep{flex:none;width:1px;background:var(--line);margin:4px 2px}
-.fsel{display:grid;grid-template-columns:1fr 1fr auto;gap:6px}
+.fsel{display:grid;grid-template-columns:1fr auto;gap:6px}
+.fsel3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.fsel3 select{padding:8px 22px 8px 9px;font-size:13.5px;min-width:0;background-position:right 6px center}
 .ovrr{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:2px 2px}
 .ovrr b{font:700 14px/1 var(--display);letter-spacing:.06em;white-space:nowrap;min-width:84px}
 .ovrr b span{color:var(--ovr)}
@@ -713,6 +715,8 @@ function filtered(){
       else if(c.pos!==UI.pos) return false;
     }
     if(UI.type && c.ctn!==UI.type) return false;
+    if(UI.team && String(c.tm)!==UI.team) return false;
+    if(UI.nat && c.nat!==UI.nat) return false;
     if(min && c.ovr<min) return false;
     if(max && c.ovr>max) return false;
     if(UI.onlyNew && !(c.add>ns)) return false;
@@ -749,7 +753,8 @@ function viewKarten(){
     '<div class="searchwrap">'+IC.search+'<input type="search" id="q" placeholder="Name, Team, Land oder Kartentyp" aria-label="Suchen nach Name, Team, Land oder Kartentyp" value="'+esc(UI.q)+'" autocomplete="off"></div>'+
     '<div class="chips scroll fchips" role="group" aria-label="Position">'+pos.map(function(p){return '<button class="chip" data-pos="'+p[0]+'" aria-pressed="'+(UI.pos===p[0])+'">'+p[1]+'</button>';}).join('')+
       '<span class="fsep"></span><button class="chip" id="f-new" aria-pressed="'+UI.onlyNew+'">Neu '+nNew+'</button><button class="chip" id="f-mine" aria-pressed="'+UI.onlyMine+'">Meine</button></div>'+
-    '<div class="fsel"><select id="f-type" aria-label="Kartentyp"><option value="">Typ</option>'+types.map(function(t){return opt(t.abbr,t.name,UI.type);}).join('')+'</select>'+
+    '<div class="fsel3"><select id="f-type" aria-label="Kartentyp"><option value="">Kartentyp</option>'+types.map(function(t){return opt(t.abbr,t.name,UI.type);}).join('')+'</select>'+teamSelect()+natSelect()+'</div>'+
+    '<div class="fsel">'+
 
     '<select id="f-sort" aria-label="Sortierung">'+sorts.map(function(o){return opt(o[0],o[1].replace('Sortiert nach ','').replace(' zuerst',''),UI.sort);}).join('')+'</select>'+
     '<button class="chip" id="f-more" aria-pressed="'+UI.more+'" aria-label="Weitere Filter">'+IC.filter+(nStat?' '+nStat:'')+'</button></div>'+
@@ -766,6 +771,20 @@ function viewKarten(){
   }
   h+='</div><div id="results"></div>';
   view.innerHTML=h; ovrFill(); results();
+}
+function teamSelect(){
+  var used={}; D.cards.forEach(function(c){used[c.tm]=1;});
+  var groups={}, order=[];
+  (D.lists.team||[]).forEach(function(t){ if(!used[t.id]) return; var g=t.group||'Andere'; if(!groups[g]){groups[g]=[]; order.push(g);} groups[g].push(t); });
+  return '<select id="f-team" aria-label="Team"><option value="">Team</option>'+order.map(function(g){
+    return '<optgroup label="'+esc(g)+'">'+groups[g].slice().sort(function(a,b){return a.name.localeCompare(b.name);}).map(function(t){return opt(String(t.id),t.name+(t.abbr?' ('+t.abbr+')':''),UI.team);}).join('')+'</optgroup>';
+  }).join('')+'</select>';
+}
+function natDe(n){ var d=NAT_DE[(n||'').toUpperCase()]; if(!d) return n; d=d.split(' ')[0]; return d==='USA'?'USA':d.charAt(0)+d.slice(1).toLowerCase(); }
+function natSelect(){
+  var cnt={}; D.cards.forEach(function(c){ if(c.nat) cnt[c.nat]=(cnt[c.nat]||0)+1; });
+  var list=Object.keys(cnt).sort(function(a,b){return natDe(a).localeCompare(natDe(b),'de');});
+  return '<select id="f-nat" aria-label="Land"><option value="">Land</option>'+list.map(function(n){return opt(n,natDe(n)+' ('+cnt[n]+')',UI.nat);}).join('')+'</select>';
 }
 function ovrFill(){
   var f=document.getElementById('ovr-fill'); if(!f) return;
@@ -1528,6 +1547,8 @@ view.addEventListener('change',function(e){
   if(tab()==='setup'&&e.target.id&&/^(s-(coach|captain|prio|strict|dhand|cap|ap|rate)|w-.*)$/.test(e.target.id)) setTimeout(function(){ if(tab()==='setup') viewSetup(); },0);
   var t=e.target, d=t.dataset;
   if(t.id==='f-type'){UI.type=t.value; UI.limit=40; results();}
+  else if(t.id==='f-team'){UI.team=t.value; UI.limit=40; results();}
+  else if(t.id==='f-nat'){UI.nat=t.value; UI.limit=40; results();}
   else if(t.id==='f-sort'){UI.sort=t.value; UI.limit=40; results();}
   else if(t.id==='f-xf'){UI.xf=t.value; UI.limit=40; results();}
   else if(t.id==='f-hgt'){UI.hgt=t.value; UI.limit=40; results();}
