@@ -511,18 +511,20 @@
   /* Eigene Bewertung: gewichteter Schnitt der Attribut-Gruppen, sonst OVR. */
   /* Groesse in cm aus 6' 1" */
   function heightCm(h) { var m = /(\d+)'\s*(\d+)/.exec(h || ''); return m ? Math.round(((+m[1]) * 12 + (+m[2])) * 2.54) : 0; }
-  /* Groesse als Wert 0-99: Feldspieler 175 cm = 50, 200 cm = 99; Goalies 180 cm = 50, 200 cm = 99 */
+  /* Groesse als Wert, sanft ansteigend und ohne harte Grenze bei 2 m:
+     Feldspieler 1,70 m = 40, 1,85 m = 61, 2,00 m = 83, 2,10 m = 97
+     Goalies     1,78 m = 40, 1,88 m = 58, 2,00 m = 80, 2,08 m = 94 */
   function sizeScore(p) {
-    var cm = heightCm(p.hgt); if (!cm) return 50;
-    var base = p.k === 'g' ? 180 : 175, step = p.k === 'g' ? 2.45 : 1.96;
-    return Math.max(0, Math.min(99, 50 + (cm - base) * step));
+    var cm = heightCm(p.hgt); if (!cm) return 60;
+    var base = p.k === 'g' ? 178 : 170, step = p.k === 'g' ? 1.8 : 1.43;
+    return Math.max(0, Math.min(99, 40 + (cm - base) * step));
   }
   /* Eigene Bewertung: gewichteter Schnitt aus OVR, Attributgruppen und Groesse.
      Fehlt ein Gewicht, zaehlt OVR normal (1), Groesse egal (0). */
   function rating(weights) {
     weights = weights || {};
     var wOf = function (k, d) { return weights[k] == null || weights[k] === '' ? d : +weights[k] || 0; };
-    var keys = Object.keys(GROUPS), wO = wOf('ovr', 1), wS = wOf('size', 0), wG = wOf('gsize', 0), sum = wO + wS;
+    var keys = Object.keys(GROUPS), wO = wOf('ovr', 1), wS = wOf('size', 0) * 0.5, wG = wOf('gsize', 0) * 0.35, sum = wO + wS;
     keys.forEach(function (k) { sum += wOf(k, 1); });
     return function (p) {
       if (p.k !== 's') { var gs = wO + wG; if (!wG || !gs) return p.ovr; return Math.round((wO * p.ovr + wG * sizeScore(p)) / gs * 10) / 10; }
