@@ -505,7 +505,7 @@ details>summary{font:700 15px/1.2 var(--display);letter-spacing:.1em;text-transf
 'use strict';
 var D=null, byKey={}, byName={}, teamName={}, typeName={};
 var S={cap:'', ap:'', coach:'', strict:true, dHand:'', game:'', upMax:'', upTol:'3', prio:'bal', seenNewer:0, captain:'auto', useRating:false,
-       weights:{skating:1,shooting:1,hands:1,checking:1,defense:1}, lastSeen:'', prevSeen:''};
+       weights:{ovr:1,skating:1,shooting:1,hands:1,checking:1,defense:1,size:0,gsize:0}, lastSeen:'', prevSeen:''};
 var VERSIONS=null; var VD={}, VER='', V={owned:[],locks:{},bans:{},lineups:[],xfOn:{}};  /* Daten je NHL-Version */
 var SHARED=null;   /* geteilter Kader aus einem Link: nur ansehen */
 var RES=null;      /* letzte Optimierung, wird bei jeder Aenderung verworfen */
@@ -655,7 +655,7 @@ function sheetHtml(c){
   h+='</div>';
   h+='<h2>Steckbrief</h2><div class="card"><dl class="facts">'+
      '<dt>Team</dt><dd>'+esc(teamName[c.tm]||c.tmn)+'</dd><dt>Liga</dt><dd>'+esc(c.lgn)+'</dd><dt>Nation</dt><dd>'+esc(c.nat)+'</dd>'+
-     '<dt>Größe</dt><dd>'+esc(c.hgt)+'</dd><dt>Gewicht</dt><dd>'+(c.wgt||'–')+' lb</dd><dt>Schusshand</dt><dd>'+(c.hand==='L'?'Links':'Rechts')+'</dd>'+
+     '<dt>Größe</dt><dd>'+(HUT.heightCm(c.hgt)?(HUT.heightCm(c.hgt)/100).toFixed(2).replace('.',',')+' m':'–')+'</dd><dt>Gewicht</dt><dd>'+(c.wgt?Math.round(c.wgt*0.4536)+' kg':'–')+'</dd><dt>Schusshand</dt><dd>'+(c.hand==='L'?'Links':'Rechts')+'</dd>'+
      '<dt>Kartentyp</dt><dd>'+esc(typeName[c.ctn]||c.ctn)+'</dd>'+(c.add?'<dt>Im Spiel seit</dt><dd>'+esc(c.add.split('-').reverse().join('.'))+'</dd>':'')+'</dl></div>';
   var others=(byName[c.n]||[]).filter(function(o){return o!==c;}).sort(function(a,b){return b.ovr-a.ovr;});
   if(others.length){
@@ -697,7 +697,7 @@ function filtered(){
     if(UI.onlyNew && !(c.add>ns)) return false;
     if(UI.onlyMine && !isOwned(c)) return false;
     if(UI.hand && c.hand!==UI.hand) return false;
-    if(hmin && inches(c.hgt)<hmin) return false;
+    if(hmin && HUT.heightCm(c.hgt)<hmin) return false;
     if(UI.xf && !c.xf.some(function(x){return D.xf[x]&&D.xf[x].n===UI.xf;})) return false;
     if(stats.length||sortAttr>=0){
       if(c.k!=='s') return false;
@@ -733,7 +733,7 @@ function viewKarten(){
   if(UI.more){
     h+='<div class="card"><div class="two" style="margin-bottom:10px">'+
       '<select id="f-xf" aria-label="X-Factor"><option value="">Jeder X-Factor</option>'+Object.keys(xfNames).sort().map(function(n){return opt(n,n,UI.xf);}).join('')+'</select>'+
-      '<select id="f-hgt" aria-label="Mindestgröße"><option value="">Jede Größe</option>'+[[70,"ab 5' 10\""],[72,"ab 6' 0\""],[74,"ab 6' 2\""],[76,"ab 6' 4\""]].map(function(o){return opt(o[0],o[1],UI.hgt);}).join('')+'</select></div>'+
+      '<select id="f-hgt" aria-label="Mindestgröße"><option value="">Jede Größe</option>'+[178,183,188,193,198].map(function(v){return opt(v,'ab '+(v/100).toFixed(2).replace('.',',')+' m',UI.hgt);}).join('')+'</select></div>'+
       '<select id="f-hand" aria-label="Schusshand" style="margin-bottom:8px">'+opt('','Beide Schusshände',UI.hand)+opt('L','Linksschütze',UI.hand)+opt('R','Rechtsschütze',UI.hand)+'</select>'+
       '<p class="small mute" style="margin-top:4px">Mindestwerte für Feldspieler:</p><div class="statgrid">'+SA.map(function(a,i){return '<label for="st'+i+'">'+a+'<input type="number" inputmode="numeric" min="0" max="99" id="st'+i+'" data-stat="'+i+'" value="'+(UI.stat[i]||'')+'" placeholder="–" title="'+SAL[i]+'"></label>';}).join('')+'</div>'+
       '<p style="margin:10px 0 0"><button class="btn ghost sm" id="f-clear">Stat-Filter zurücksetzen</button></p></div>';
@@ -1165,7 +1165,10 @@ function viewSetup(){
      '<label class="check"><input type="checkbox" id="s-strict"'+(S.strict?' checked':'')+'> Feste Positionen (LW, C, RW und LD, RD)</label>'+
      '<div class="field" style="margin-top:12px"><label for="s-dhand">Verteidiger-Seiten</label><select id="s-dhand">'+opt('','Nach Kartenposition',S.dHand)+opt('off','Gegenseite für One-Timer',S.dHand)+opt('on','Eigene Schussseite',S.dHand)+'</select></div>');
   var rb='<label class="check"><input type="checkbox" id="s-rate"'+(S.useRating?' checked':'')+'> Spieler nach meinen Gewichten bewerten statt nach OVR</label>';
-  if(S.useRating) rb+='<div class="statgrid" style="margin:10px 0">'+Object.keys(GRP).map(function(g){return '<label for="w-'+g+'">'+GRP[g].toUpperCase()+'<select id="w-'+g+'" data-w="'+g+'">'+[[0,'egal'],[1,'normal'],[2,'wichtig'],[3,'sehr wichtig']].map(function(o){return opt(o[0],o[1],S.weights[g]);}).join('')+'</select></label>';}).join('')+'</div><p class="small mute">Goalies bleiben bei OVR.</p>';
+  var wsel=function(g,lab,def){var cur=S.weights[g]==null?def:S.weights[g]; return '<label for="w-'+g+'">'+lab+'<select id="w-'+g+'" data-w="'+g+'">'+[[0,'egal'],[1,'normal'],[2,'wichtig'],[3,'sehr wichtig']].map(function(o){return opt(o[0],o[1],cur);}).join('')+'</select></label>';};
+  if(S.useRating) rb+='<div class="lab" style="margin:12px 0 6px">Feldspieler</div><div class="statgrid">'+wsel('ovr','OVR',1)+Object.keys(GRP).map(function(g){return wsel(g,GRP[g].toUpperCase(),1);}).join('')+wsel('size','GRÖSSE',0)+'</div>'+
+    '<div class="lab" style="margin:12px 0 6px">Goalies</div><div class="statgrid">'+wsel('ovr','OVR',1).replace('id="w-ovr"','id="w-ovr-g"').replace('for="w-ovr"','for="w-ovr-g"')+wsel('gsize','GRÖSSE',0)+'</div>'+
+    '<p class="small mute">So rechnet die App: Wert = gewichteter Schnitt aus OVR, den Attributgruppen (Durchschnitt ihrer Einzelwerte) und der Größe. „Normal“ zählt einfach, „wichtig“ doppelt, „sehr wichtig“ dreifach, „egal“ gar nicht. Größe wird auf 0–99 umgerechnet: Feldspieler 1,75 m = 50 bis 2,00 m = 99, Goalies 1,80 m = 50 bis 2,00 m = 99. OVR gilt für Feldspieler und Goalies gemeinsam.</p>';
   h+=grp('rate','Eigene Bewertung',S.useRating?'an':'aus, es zählt OVR',rb);
   h+=grp('app','App &amp; Daten',esc(m.game||'')+' · Stand '+new Date(m.updated).toLocaleDateString('de-DE'),
      (VERSIONS&&VERSIONS.versions.length>1?'<div class="field"><label for="s-game">NHL-Version</label><select id="s-game">'+VERSIONS.versions.map(function(x){var n=(VD[String(x.version)]&&VD[String(x.version)].owned||[]).length; return opt(String(x.version),x.game+(n?' · '+n+' Karten':''),VER);}).join('')+'</select></div>':'')+newerHtml(true)+
@@ -1482,7 +1485,7 @@ view.addEventListener('input',function(e){
   else if(t.id==='s-ap'){S.ap=t.value; save();}
 });
 view.addEventListener('change',function(e){
-  if(tab()==='setup'&&e.target.id&&/^s-(coach|captain|prio|strict|dhand|cap|ap)$/.test(e.target.id)) setTimeout(function(){ if(tab()==='setup') viewSetup(); },0);
+  if(tab()==='setup'&&e.target.id&&/^(s-(coach|captain|prio|strict|dhand|cap|ap|rate)|w-.*)$/.test(e.target.id)) setTimeout(function(){ if(tab()==='setup') viewSetup(); },0);
   var t=e.target, d=t.dataset;
   if(t.id==='f-type'){UI.type=t.value; UI.limit=40; results();}
   else if(t.id==='f-min'){UI.min=t.value; UI.limit=40; results();}
