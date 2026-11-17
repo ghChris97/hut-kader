@@ -94,6 +94,7 @@ p{margin:0 0 10px}
 .antabs button{border:0;background:none;color:var(--mute);padding:9px 2px;font:700 12.5px/1.1 var(--display);letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
 .antabs button[aria-selected=true]{background:#fff;color:#0d1117}
 .anlead{font-size:13px;color:var(--mute);margin:10px 0 12px}
+.lsum{color:var(--ovr);font-weight:600;font-size:13px}
 .bpbox{display:flex;flex-direction:column;gap:10px;margin:10px 0}
 .bpbox .seg{margin:0}
 .bpm .mc{width:58px}
@@ -1409,7 +1410,7 @@ function lbHtml(){
     if(dup) h+='<p class="note warn">Ein Spieler darf nur einmal in der Reihe stehen.</p>';
     else{
       var l=HUT.evalLine(ps,HUT.combosFor(D,isD?'defense':'forwards',S.coach),valFn());
-      h+='<div class="line"><div class="linehead"><strong>Boni dieser Kombi</strong><div class="pills">'+pillsFor(l.boosts)+'</div></div>'+
+      h+='<div class="line"><div class="linehead"><strong>Boni dieser Kombi</strong><div class="pills">'+pillsFor(l.boosts)+'</div></div>'+lineSum(l)+
         l.active.map(function(c){return '<div class="combo">'+(c.src==='Coach'?'Coach: ':'')+comboHtml(c)+' <b>'+boostLabel(c)+'</b></div>';}).join('')+'</div>';
       if(!l.active.length) h+='<p class="small mute">Mit dieser Kombination greift kein Bonus'+(S.coach?' (auch keiner vom Coach '+esc(S.coach)+')':'')+'.</p>';
       h+='<p class="small">Gehalt der Reihe: <b style="color:var(--sal)">'+money(ps.reduce(function(s,p){return s+(p.sal||0);},0))+'</b></p>';
@@ -1427,7 +1428,7 @@ function lbHtml(){
       var l=b.line;
       return '<div class="nms"><div class="nmh"><div class="pills">'+pillsFor(l.boosts)+'</div>'+(st.bp.length>1?'<span class="small mute">'+(ix+1)+' / '+st.bp.length+'</span>':'')+'</div>'+
         '<div class="mini bpm">'+b.add.map(function(c){return '<button class="mc'+(isOwned(c)?' own':'')+'" data-card="'+key(c)+'">'+img(c)+'<i>'+c.ovr+'</i></button>';}).join('')+'</div>'+
-        '<div class="small">'+b.add.map(function(c){return esc(nice(c.n))+' ('+c.ovr+' '+esc(c.pos)+')';}).join(', ')+'</div>'+
+        '<div class="small">'+b.add.map(function(c){return esc(nice(c.n))+' ('+c.ovr+' '+esc(c.pos)+')';}).join(', ')+' · '+lineSum(l)+'</div>'+
         l.active.map(function(c){return '<div class="combo">'+(c.src==='Coach'?'Coach: ':'')+comboHtml(c)+' <b>'+boostLabel(c)+'</b></div>';}).join('')+
         '<p><button class="btn ghost sm" data-bpuse="'+ix+'">In den Baukasten übernehmen</button></p></div>';
     }).join('')+'</div></div>';
@@ -1435,6 +1436,7 @@ function lbHtml(){
   return h;
 }
 var PICKCB=null;
+function lineSum(l){ var n=l.players.length, sum=l.players.reduce(function(s,p){return s+p.ovr;},0)+l.boosts.overall*n; return '<span class="lsum">Ø '+(sum/n).toFixed(1).replace('.',',')+' OVR mit Boni</span>'; }
 function bpRun(){
   var st=lbState(), isD=st.t==='d', n=isD?2:3, posOf=isD?[['LD','RD'],['LD','RD']]:[['LW'],['C'],['RW']];
   var fixed=[], slots=[];
