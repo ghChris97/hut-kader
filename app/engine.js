@@ -339,9 +339,9 @@
     var fAll = combosFor(data, 'forwards', opts.coach), dAll = combosFor(data, 'defense', opts.coach);
     var groups = [{ key: 'forwards', lines: res.forwards, combos: fAll, pos: F_POS, label: '. Reihe' }, { key: 'defense', lines: res.defense, combos: dAll, pos: D_POS, label: '. Paar' }];
     var room = capBase > 0 ? capBase - (res.totals.sal - res.totals.salBoost) : Infinity;
-    var minOvr = opts.minOvr || 0, out = [];
+    var minOvr = opts.minOvr || 0, maxO = opts.maxOvr || 0, out = [];
     data.cards.forEach(function (c) {
-      if (have[key(c)] || c.ovr < minOvr) return;
+      if (have[key(c)] || c.ovr < minOvr || (maxO && c.ovr > maxO)) return;
       var best = null;
       if (c.k === 'g') {
         res.goalies.forEach(function (g, gi) {
@@ -383,7 +383,7 @@
      Sortiert nach gewonnenen Boni, dann nach niedrigerer OVR (meist leichter zu bekommen). */
   function bonusUpgrades(data, res, opts, limit) {
     var ctx = res.ctx, w = ctx.w, val = ctx.val, capBase = res.capBase || 0;
-    var tol = opts.tol != null ? opts.tol : 3, maxOvr = opts.maxOvr || 0;
+    var tol = opts.tol != null ? opts.tol : 3, maxOvr = opts.maxOvr || 0, minOvrB = opts.minOvr || 0;
     var have = {}, inLineup = {};
     ctx.owned.forEach(function (c) { have[key(c)] = 1; });
     lineupPlayers(res).forEach(function (p) { inLineup[p.n] = 1; });
@@ -393,7 +393,7 @@
     var cst = res.totals.captain, capTeams = cst ? captainTeams(cst.cap, data) : null;
     var out = [];
     data.cards.forEach(function (c) {
-      if (c.k !== 's' || have[key(c)] || (maxOvr && c.ovr > maxOvr) || inLineup[c.n]) return;
+      if (c.k !== 's' || have[key(c)] || (maxOvr && c.ovr > maxOvr) || c.ovr < minOvrB || inLineup[c.n]) return;
       var best = null;
       groups.forEach(function (g) {
         if (g.pos.indexOf(c.pos) < 0) return;

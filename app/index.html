@@ -769,7 +769,7 @@ function viewKarten(){
   var sorts=[['ovr','Sortiert nach Overall'],['aovr','Sortiert nach Adjusted Overall'],['new','Neueste Karten zuerst'],['sal','Günstigstes Gehalt zuerst']];
   if(S.useRating) sorts.push(['val','Sortiert nach eigener Bewertung']);
   SAL.forEach(function(l,i){sorts.push(['a'+i,'Sortiert nach '+l]);});
-  if(!UI.ovrLo){ UI.ovrLo=Math.min.apply(null,D.cards.map(function(c){return c.ovr;})); UI.ovrHi=Math.max.apply(null,D.cards.map(function(c){return c.ovr;})); }
+  ovrBounds();
   var lo=+UI.min||UI.ovrLo, hi=+UI.max||UI.ovrHi;
   var h=newerHtml(false)+'<div class="filters">'+
     '<div class="searchwrap">'+IC.search+'<input type="search" id="q" placeholder="Name, Team, Land oder Kartentyp" aria-label="Suchen nach Name, Team, Land oder Kartentyp" value="'+esc(UI.q)+'" autocomplete="off"></div>'+
@@ -854,6 +854,13 @@ document.addEventListener('click',function(e){
   if(t.dataset.pclose){ el.classList.remove('on'); return; }
   if(t.dataset.pv!=null){ UI[PICK[el.dataset.kind][1]]=t.dataset.pv; UI.limit=40; el.classList.remove('on'); viewKarten(); }
 },true);
+function ovrBounds(){ if(!UI.ovrLo){ UI.ovrLo=Math.min.apply(null,D.cards.map(function(c){return c.ovr;})); UI.ovrHi=Math.max.apply(null,D.cards.map(function(c){return c.ovr;})); } }
+function dualFill(p){
+  var a=document.getElementById(p+'-lo'), b=document.getElementById(p+'-hi'), f=document.getElementById(p+'-fill'); if(!a||!f) return;
+  var span=(UI.ovrHi-UI.ovrLo)||1;
+  f.style.left=((a.value-UI.ovrLo)/span*100)+'%'; f.style.right=((UI.ovrHi-b.value)/span*100)+'%';
+  document.getElementById(p+'-lab').innerHTML='OVR <span>'+a.value+'–'+b.value+'</span>';
+}
 function ovrFill(){
   var f=document.getElementById('ovr-fill'); if(!f) return;
   var lo=+document.getElementById('f-lo').value, hi=+document.getElementById('f-hi').value, span=(UI.ovrHi-UI.ovrLo)||1;
@@ -1231,12 +1238,12 @@ function upHtml(){
   if(!owned().length) return '<p class="small mute">Lege zuerst deinen Kader an.</p>';
   var bonus=UI.upMode!=='ovr';
   var h='<div class="seg" role="group" aria-label="Art der Vorschläge"><button id="up-m-bonus" aria-pressed="'+bonus+'">Mehr Boni</button><button id="up-m-ovr" aria-pressed="'+!bonus+'">Stärkste Karten</button></div>';
-  if(bonus){
-    h+='<div class="two" style="margin-bottom:10px"><select id="up-max" aria-label="Höchste OVR der Vorschläge">'+opt('','Jede Stärke',UI.upMax)+[78,80,82,84,86,88].map(function(v){return opt(v,'Höchstens '+v+' OVR',UI.upMax);}).join('')+'</select>'+
-      '<select id="up-tol" aria-label="Wie viel schwächer darf die Karte sein">'+[[0,'Nicht schwächer'],[2,'Max. 2 schwächer'],[3,'Max. 3 schwächer'],[5,'Max. 5 schwächer'],[8,'Max. 8 schwächer']].map(function(o){return opt(o[0],o[1],UI.upTol);}).join('')+'</select></div>';
-  }else{
-    h+='<div style="margin-bottom:10px"><select id="up-min" aria-label="Mindest-Overall der Vorschläge">'+opt('','Alle Karten prüfen',UI.upMin)+[84,86,88,90].map(function(v){return opt(v,'Nur Karten ab '+v+' OVR',UI.upMin);}).join('')+'</select></div>';
-  }
+  ovrBounds();
+  var lo=+UI.upMin||UI.ovrLo, hi=+UI.upMax||UI.ovrHi;
+  h+='<div class="ovrr" style="margin-bottom:8px"><b id="u-lab">OVR <span>'+lo+'–'+hi+'</span></b><div class="dual"><div class="trk"></div><div class="fill" id="u-fill"></div>'+
+    '<input type="range" id="u-lo" min="'+UI.ovrLo+'" max="'+UI.ovrHi+'" value="'+lo+'" aria-label="OVR mindestens">'+
+    '<input type="range" id="u-hi" min="'+UI.ovrLo+'" max="'+UI.ovrHi+'" value="'+hi+'" aria-label="OVR höchstens"></div></div>';
+  if(bonus) h+='<div style="margin-bottom:10px"><select id="up-tol" aria-label="Wie viel schwächer darf die Karte sein">'+[[0,'Nicht schwächer als der Ersetzte'],[2,'Max. 2 schwächer als der Ersetzte'],[3,'Max. 3 schwächer als der Ersetzte'],[5,'Max. 5 schwächer als der Ersetzte'],[8,'Max. 8 schwächer als der Ersetzte']].map(function(o){return opt(o[0],o[1],UI.upTol);}).join('')+'</select></div>';
   h+='<p><button class="btn" id="up-run" style="width:100%">Vorschläge berechnen</button></p>';
   if(UI.up==='run') return h+'<p class="mute">Rechne alle Karten durch …</p>';
   if(!UI.up) return h+'<p class="small mute">'+(bonus?'Sucht Karten, die in deiner Aufstellung neue Combos oder den Captain-Bonus freischalten, ohne viel schwächer zu sein als der Spieler, den sie ersetzen. Oben stehen die Karten mit den meisten neuen Boni, bei gleichem Bonus die mit niedrigerer OVR, weil die meist leichter zu bekommen sind. Je Spieler steht nur eine Version da.':'Prüft jede Karte, die du nicht hast: Wo würde sie in deiner aktuellen Aufstellung am meisten bringen, mit allen Combos?')+'</p>';
@@ -1264,7 +1271,7 @@ function upHtml(){
   }).join('')+'</div><p class="small mute" style="margin-top:8px">'+(bonus?'Gerechnet wird je Karte der beste einzelne Tausch in deiner aktuellen Aufstellung, mit Trainer- und Captain-Boni.':'Punkte = Zugewinn in der Wertung des Optimierers (1 Punkt entspricht 1 OVR bei einem Spieler). Gerechnet wird je Karte der beste einzelne Tausch. Captain-Boni bleiben hier außen vor.')+'</p>';
 }
 function viewAnalyse(){
-  view.innerHTML=sharedHtml()+'<h2>Vorschläge für neue Karten</h2>'+upHtml()+'<h2>Kartenvergleich</h2>'+cmpHtml();
+  view.innerHTML=sharedHtml()+'<h2>Vorschläge für neue Karten</h2>'+upHtml()+'<h2>Kartenvergleich</h2>'+cmpHtml(); dualFill('u');
 }
 
 /* ---------- Setup ---------- */
@@ -1588,15 +1595,22 @@ document.addEventListener('click',function(e){
     case 'rv-ov': UI.rv='ov'; viewReihen(); break;
     case 'rv-det': UI.rv='det'; viewReihen(); break;
     case 'up-run': UI.up='run'; viewAnalyse(); setTimeout(function(){var o=opts();
-      if(UI.upMode!=='ovr'){ o.maxOvr=+UI.upMax||0; o.tol=+UI.upTol; UI.up=HUT.bonusUpgrades(D,result(),o,30); }
-      else { o.minOvr=+UI.upMin||0; UI.up=HUT.upgrades(D,result(),o,25); }
+      o.minOvr=+UI.upMin||0; o.maxOvr=+UI.upMax||0;
+      if(UI.upMode!=='ovr'){ o.tol=+UI.upTol; UI.up=HUT.bonusUpgrades(D,result(),o,30); }
+      else { UI.up=HUT.upgrades(D,result(),o,25); }
       if(tab()==='analyse') viewAnalyse();},30); break;
     case 'up-m-bonus': UI.upMode='bonus'; UI.up=null; viewAnalyse(); break;
     case 'up-m-ovr': UI.upMode='ovr'; UI.up=null; viewAnalyse(); break;
   }
 });
 view.addEventListener('input',function(e){
-  var t0=e.target; if(t0.id==='f-lo'||t0.id==='f-hi'){ var t=t0;
+  var t0=e.target;
+  if(t0.id==='u-lo'||t0.id==='u-hi'){
+    var ua=document.getElementById('u-lo'), ub=document.getElementById('u-hi');
+    if(+ua.value>+ub.value){ if(t0.id==='u-lo') ua.value=ub.value; else ub.value=ua.value; }
+    UI.upMin=+ua.value>UI.ovrLo?ua.value:''; UI.upMax=S.upMax=+ub.value<UI.ovrHi?ub.value:''; S.upMin=UI.upMin; UI.up=null; dualFill('u'); clearTimeout(UI.uT); UI.uT=setTimeout(save,300); return;
+  }
+  if(t0.id==='f-lo'||t0.id==='f-hi'){ var t=t0;
 
     var a=document.getElementById('f-lo'), b=document.getElementById('f-hi');
     if(+a.value>+b.value){ if(t.id==='f-lo') a.value=b.value; else b.value=a.value; }
@@ -1645,7 +1659,7 @@ document.getElementById('file-shot').addEventListener('change',function(){runImp
 document.getElementById('file-cam').addEventListener('change',function(){runImport(this.files); this.value='';});
 window.addEventListener('hashchange',function(){ if(CARD){CARD=null; sheet.classList.remove('on'); document.body.classList.remove('sheet-open');} UI.saved=-1; if(tab()!=='kader'&&UI.imp&&UI.imp.step!=='scan') UI.imp=null; render(); view.scrollTop=0;});
 
-load(); UI.upMax=S.upMax||''; UI.upTol=S.upTol||'3'; render();
+load(); UI.upMax=S.upMax||''; UI.upMin=S.upMin||''; UI.upTol=S.upTol||'3'; render();
 function loadData(){
   var urlGame=new URLSearchParams(location.search).get('g');
   return fetch('versions.json?v=__BUILD__').then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}).then(function(vs){
