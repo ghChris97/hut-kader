@@ -1442,7 +1442,7 @@ function pkScan(file){
 document.addEventListener('click',function(e){
   var t=e.target.closest&&e.target.closest('#pk-add,#pk-run,[data-pkdel]'); if(!t) return;
   var st=pkState();
-  if(t.id==='pk-add'){ e.preventDefault(); e.stopPropagation(); openCardPick(0,function(k){ if(st.k.indexOf(k)<0) st.k.push(k); st.res=null; viewAnalyse(); },true); return; }
+  if(t.id==='pk-add'){ e.preventDefault(); e.stopPropagation(); openCardPick(0,function(k){ if(st.k.indexOf(k)<0) st.k.push(k); st.res=null; viewAnalyse(); },true,true); return; }
   if(t.dataset.pkdel!=null){ st.k.splice(+t.dataset.pkdel,1); st.res=null; viewAnalyse(); return; }
   if(t.id==='pk-run'){ t.textContent='Rechne …'; setTimeout(function(){ st.res=pkRank(); st.msg=''; viewAnalyse(); },30); }
 },true);
@@ -1508,17 +1508,18 @@ function bpRun(){
   var w=PRIO[S.prio]||PRIO.bal;
   st.bp=HUT.bestPartners(D,fixed,slots,pool,{line:isD?'defense':'forwards',coach:S.coach,val:valFn(),w:w,n:8});
 }
-function openCardPick(slot,cb,anyPos){
+function openCardPick(slot,cb,anyPos,notOwned){
   var el=document.getElementById('picker'), st=lbState(), isD=st.t==='d';
   PICKCB=cb||null;
   el.innerHTML='<div class="pkbg" data-pclose="1"></div><div class="pkbox" role="dialog" aria-modal="true" aria-label="Karte wählen"><div class="pkhead"><b>Karte wählen</b><button class="pkx" data-pclose="1" aria-label="Schließen">'+IC.x+'</button></div>'+
     '<div class="searchwrap pks">'+IC.search+'<input type="search" id="cp-q" placeholder="Name, Team, Land oder Kartentyp" autocomplete="off"></div><div class="pklist" id="cp-list"></div></div>';
   el.dataset.kind='card'; el.dataset.slot=slot; el.classList.add('on');
   var q=document.getElementById('cp-q'), list=document.getElementById('cp-list');
-  var pool=anyPos?D.cards:D.cards.filter(function(c){return c.k==='s'&&(isD?['LD','RD']:['LW','C','RW']).indexOf(c.pos)>=0;});
+  var pool=notOwned?D.cards.filter(function(c){return !isOwned(c);}):anyPos?D.cards:D.cards.filter(function(c){return c.k==='s'&&(isD?['LD','RD']:['LW','C','RW']).indexOf(c.pos)>=0;});
   var draw=function(){
     var v=q.value.trim().toUpperCase(), ws=v?v.split(/\s+/):[];
     var res=pool.filter(function(c){return ws.every(function(w){return searchText(c).indexOf(w)>=0;});});
+    if(notOwned&&!ws.length){ list.innerHTML='<p class="small mute" style="padding:8px 4px">Tippe den Namen eines Spielers aus dem Pack ein. Karten, die du schon hast, werden nicht angezeigt.</p>'; return; }
     res.sort(function(a,b){return (isOwned(b)?1:0)-(isOwned(a)?1:0)||b.ovr-a.ovr;});
     list.innerHTML=res.slice(0,60).map(function(c){return '<button class="pki pkc" data-cpick="'+key(c)+'"><span class="pkimg">'+img(c)+'</span><span class="pkl">'+esc(nice(c.n))+' <em>'+c.ovr+' · '+esc(c.pos)+' · '+esc(c.tmn)+' · '+esc(c.ctn)+'</em></span>'+(isOwned(c)?'<span class="pkn">✓</span>':'')+'</button>';}).join('')||'<p class="small mute">Keine Karte gefunden.</p>';
   };
