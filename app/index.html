@@ -104,7 +104,7 @@ p{margin:0 0 10px}
 .bprt{min-width:0;display:flex;flex-direction:column;gap:4px}
 .bprh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .bprh .lsum{font-size:16px}
-.btn.bpuse{align-self:flex-start;padding:4px 10px;font-size:11px;min-height:0;margin-top:2px;border-radius:3px}
+.bprt .btn.bpuse{align-self:flex-start;padding:5px 10px!important;font-size:11px!important;min-height:0!important;height:auto!important;margin-top:2px;border-radius:3px}
 .pkcand{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
 .pkc2{position:relative}
 .pkc2 .mc,.pkr .mc{position:relative;width:58px;aspect-ratio:804/1128;padding:0;border:0;background:var(--surface2);overflow:hidden;display:block;cursor:pointer}
@@ -248,6 +248,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--line2);outline:none}
 .combo b{color:var(--ice);margin-left:2px}
 .rq{display:inline-flex;align-items:center;gap:4px;padding:2px 6px 2px 3px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:var(--ice);font-size:12px;white-space:nowrap;border-radius:2px}
 .rq img{width:18px;height:18px;object-fit:contain}
+.cmbi{display:inline-flex;align-items:center;gap:3px;flex-wrap:wrap;padding:2px 6px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:2px}
+.rqi{width:22px;height:22px;object-fit:contain}
+.rqt{font-size:11.5px;color:var(--ice);white-space:nowrap}
 .amp,.plus{color:var(--faint);font-size:12px;margin:0 1px}
 .k img{width:14px;height:14px;object-fit:contain;vertical-align:-2px;margin-right:3px}
 .nmx{padding:10px 0;border-top:1px solid var(--line)} .nmx:first-of-type{border-top:0}
@@ -1012,8 +1015,12 @@ function reqChip(r){
   var lg=logoOf(r.kind,(r.ids||[])[0]);
   return '<span class="rq">'+(lg?'<img src="'+esc(D.meta.img_base+lg)+'" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">':'')+esc(r.name)+'</span>';
 }
+function reqIcon(r){
+  var lg=logoOf(r.kind,(r.ids||[])[0]);
+  return lg?'<img class="rqi" src="'+esc(D.meta.img_base+lg)+'" alt="'+esc(r.name)+'" title="'+esc(r.name)+'" loading="lazy" referrerpolicy="no-referrer" onerror="this.outerHTML=\'<span class=rqt>'+esc(r.name).replace(/'/g,'')+'</span>\'">':'<span class="rqt">'+esc(r.name)+'</span>';
+}
 function reqSlot(sl){return sl.map(reqChip).join('<span class="amp">&</span>');}
-function comboHtml(c){return c.slots.map(reqSlot).join('<span class="plus">+</span>');}
+function comboHtml(c){return '<span class="cmbi">'+c.slots.map(function(sl){return sl.map(reqIcon).join('<span class="amp">&</span>');}).join('<span class="plus">+</span>')+'</span>';}
 function plHtml(p,top,boost){
   return '<button class="pl" data-card="'+key(p)+'" aria-label="Details zu '+esc(nice(p.n))+'"><div class="img"><div class="ovr">'+p.ovr+'</div>'+img(p)+(boost?'<span class="boost">+'+boost+'</span>':'')+'</div>'+
     '<div class="n">'+esc(nice(p.n))+'</div><div class="v">'+esc(top)+' · '+money(p.sal||0)+'</div></button>';
