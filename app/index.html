@@ -67,7 +67,19 @@ p{margin:0 0 10px}
 .fchips{gap:6px}
 .fchips .chip{padding:6px 12px;font-size:13px}
 .fsep{flex:none;width:1px;background:var(--line);margin:4px 2px}
-.fsel{display:grid;grid-template-columns:1.1fr .8fr 1.3fr auto;gap:6px}
+.fsel{display:grid;grid-template-columns:1fr 1fr auto;gap:6px}
+.ovrr{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:2px 2px}
+.ovrr b{font:700 14px/1 var(--display);letter-spacing:.06em;white-space:nowrap;min-width:84px}
+.ovrr b span{color:var(--ovr)}
+.dual{position:relative;height:28px}
+.dual .trk{position:absolute;left:0;right:0;top:12px;height:4px;background:var(--line)}
+.dual .fill{position:absolute;top:12px;height:4px;background:var(--ice)}
+.dual input{position:absolute;inset:0;width:100%;height:28px;margin:0;background:none;-webkit-appearance:none;appearance:none;pointer-events:none}
+.dual input::-webkit-slider-thumb{-webkit-appearance:none;pointer-events:auto;width:24px;height:24px;border-radius:50%;background:#fff;border:3px solid var(--ice);cursor:pointer}
+.dual input::-moz-range-thumb{pointer-events:auto;width:20px;height:20px;border-radius:50%;background:#fff;border:3px solid var(--ice);cursor:pointer}
+.dual input::-webkit-slider-runnable-track{background:transparent;height:28px;border:0}
+.dual input::-webkit-slider-thumb{margin-top:2px}
+.dual input::-moz-range-track{background:none}
 .fsel select{padding:8px 22px 8px 9px;font-size:13.5px;min-width:0;background-position:right 6px center}
 .fsel .chip{padding:0 12px;display:grid;place-items:center}
 .logos{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;margin-top:5px}
@@ -682,11 +694,19 @@ document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&CARD) clos
 window.addEventListener('popstate',function(e){ if(e.state&&e.state.card){ if(CARD!==e.state.card) openCard(e.state.card,true); } else closeCard(true); });
 
 /* ---------- Karten ---------- */
+var NAT_DE={CANADA:'KANADA',SWEDEN:'SCHWEDEN',FINLAND:'FINNLAND',GERMANY:'DEUTSCHLAND',CZECHIA:'TSCHECHIEN TSCHECHISCHE','CZECH REPUBLIC':'TSCHECHIEN',SLOVAKIA:'SLOWAKEI',RUSSIA:'RUSSLAND',SWITZERLAND:'SCHWEIZ',AUSTRIA:'ÖSTERREICH OESTERREICH',DENMARK:'DÄNEMARK DAENEMARK',NORWAY:'NORWEGEN',LATVIA:'LETTLAND','UNITED STATES':'USA AMERIKA',USA:'USA AMERIKA',BELARUS:'WEISSRUSSLAND BELARUS',SLOVENIA:'SLOWENIEN',FRANCE:'FRANKREICH',UKRAINE:'UKRAINE',KAZAKHSTAN:'KASACHSTAN',POLAND:'POLEN',ITALY:'ITALIEN','GREAT BRITAIN':'GROSSBRITANNIEN ENGLAND',NETHERLANDS:'NIEDERLANDE HOLLAND',JAPAN:'JAPAN',HUNGARY:'UNGARN'};
+var TEAMN=null;
+function searchText(c){
+  if(c._s) return c._s;
+  if(!TEAMN){ TEAMN={team:{},ct:{}}; (D.lists.team||[]).forEach(function(t){TEAMN.team[String(t.id)]=t.name;}); (D.lists.card_type||[]).forEach(function(t){TEAMN.ct[String(t.id)]=t.name;}); }
+  var nat=(c.nat||'').toUpperCase();
+  return c._s=[c.n,c.tmn,TEAMN.team[String(c.tm)]||'',c.ctn,TEAMN.ct[String(c.ct)]||'',nat,NAT_DE[nat]||'',c.lgn||''].join(' ').toUpperCase();
+}
 function filtered(){
-  var q=UI.q.trim().toUpperCase(), min=+UI.min||0, ns=newSince(), stats=Object.keys(UI.stat), hmin=+UI.hgt||0;
+  var q=UI.q.trim().toUpperCase(), min=+UI.min||0, max=+UI.max||0, ns=newSince(), stats=Object.keys(UI.stat), hmin=+UI.hgt||0;
   var sortAttr=/^a\d+$/.test(UI.sort)?+UI.sort.slice(1):-1;
   var out=D.cards.filter(function(c){
-    if(q && c.n.indexOf(q)<0) return false;
+    if(q && !q.split(/\s+/).every(function(w){return searchText(c).indexOf(w)>=0;})) return false;
     if(UI.pos){
       if(UI.pos==='F'){ if(['LW','C','RW'].indexOf(c.pos)<0) return false; }
       else if(UI.pos==='D'){ if(['LD','RD'].indexOf(c.pos)<0) return false; }
@@ -694,6 +714,7 @@ function filtered(){
     }
     if(UI.type && c.ctn!==UI.type) return false;
     if(min && c.ovr<min) return false;
+    if(max && c.ovr>max) return false;
     if(UI.onlyNew && !(c.add>ns)) return false;
     if(UI.onlyMine && !isOwned(c)) return false;
     if(UI.hand && c.hand!==UI.hand) return false;
@@ -722,14 +743,19 @@ function viewKarten(){
   var sorts=[['ovr','Sortiert nach Overall'],['aovr','Sortiert nach Adjusted Overall'],['new','Neueste Karten zuerst'],['sal','Günstigstes Gehalt zuerst']];
   if(S.useRating) sorts.push(['val','Sortiert nach eigener Bewertung']);
   SAL.forEach(function(l,i){sorts.push(['a'+i,'Sortiert nach '+l]);});
+  if(!UI.ovrLo){ UI.ovrLo=Math.min.apply(null,D.cards.map(function(c){return c.ovr;})); UI.ovrHi=Math.max.apply(null,D.cards.map(function(c){return c.ovr;})); }
+  var lo=+UI.min||UI.ovrLo, hi=+UI.max||UI.ovrHi;
   var h=newerHtml(false)+'<div class="filters">'+
-    '<div class="searchwrap">'+IC.search+'<input type="search" id="q" placeholder="Spieler suchen" aria-label="Spielername suchen" value="'+esc(UI.q)+'" autocomplete="off"></div>'+
+    '<div class="searchwrap">'+IC.search+'<input type="search" id="q" placeholder="Name, Team, Land oder Kartentyp" aria-label="Suchen nach Name, Team, Land oder Kartentyp" value="'+esc(UI.q)+'" autocomplete="off"></div>'+
     '<div class="chips scroll fchips" role="group" aria-label="Position">'+pos.map(function(p){return '<button class="chip" data-pos="'+p[0]+'" aria-pressed="'+(UI.pos===p[0])+'">'+p[1]+'</button>';}).join('')+
       '<span class="fsep"></span><button class="chip" id="f-new" aria-pressed="'+UI.onlyNew+'">Neu '+nNew+'</button><button class="chip" id="f-mine" aria-pressed="'+UI.onlyMine+'">Meine</button></div>'+
     '<div class="fsel"><select id="f-type" aria-label="Kartentyp"><option value="">Typ</option>'+types.map(function(t){return opt(t.abbr,t.name,UI.type);}).join('')+'</select>'+
-    '<select id="f-min" aria-label="Mindest-Overall"><option value="">OVR</option>'+[80,84,86,88,90,92].map(function(v){return opt(v,'ab '+v,UI.min);}).join('')+'</select>'+
+
     '<select id="f-sort" aria-label="Sortierung">'+sorts.map(function(o){return opt(o[0],o[1].replace('Sortiert nach ','').replace(' zuerst',''),UI.sort);}).join('')+'</select>'+
-    '<button class="chip" id="f-more" aria-pressed="'+UI.more+'" aria-label="Weitere Filter">'+IC.filter+(nStat?' '+nStat:'')+'</button></div>';
+    '<button class="chip" id="f-more" aria-pressed="'+UI.more+'" aria-label="Weitere Filter">'+IC.filter+(nStat?' '+nStat:'')+'</button></div>'+
+    '<div class="ovrr"><b id="ovr-lab">OVR <span>'+lo+'–'+hi+'</span></b><div class="dual"><div class="trk"></div><div class="fill" id="ovr-fill"></div>'+
+      '<input type="range" id="f-lo" min="'+UI.ovrLo+'" max="'+UI.ovrHi+'" value="'+lo+'" aria-label="OVR mindestens">'+
+      '<input type="range" id="f-hi" min="'+UI.ovrLo+'" max="'+UI.ovrHi+'" value="'+hi+'" aria-label="OVR höchstens"></div></div>';
   if(UI.more){
     h+='<div class="card"><div class="two" style="margin-bottom:10px">'+
       '<select id="f-xf" aria-label="X-Factor"><option value="">Jeder X-Factor</option>'+Object.keys(xfNames).sort().map(function(n){return opt(n,n,UI.xf);}).join('')+'</select>'+
@@ -739,7 +765,13 @@ function viewKarten(){
       '<p style="margin:10px 0 0"><button class="btn ghost sm" id="f-clear">Stat-Filter zurücksetzen</button></p></div>';
   }
   h+='</div><div id="results"></div>';
-  view.innerHTML=h; results();
+  view.innerHTML=h; ovrFill(); results();
+}
+function ovrFill(){
+  var f=document.getElementById('ovr-fill'); if(!f) return;
+  var lo=+document.getElementById('f-lo').value, hi=+document.getElementById('f-hi').value, span=(UI.ovrHi-UI.ovrLo)||1;
+  f.style.left=((lo-UI.ovrLo)/span*100)+'%'; f.style.right=((UI.ovrHi-hi)/span*100)+'%';
+  document.getElementById('ovr-lab').innerHTML='OVR <span>'+lo+'–'+hi+'</span>';
 }
 function results(){
   var el=document.getElementById('results'); if(!el) return;
@@ -1477,6 +1509,14 @@ document.addEventListener('click',function(e){
   }
 });
 view.addEventListener('input',function(e){
+  var t0=e.target; if(t0.id==='f-lo'||t0.id==='f-hi'){ var t=t0;
+
+    var a=document.getElementById('f-lo'), b=document.getElementById('f-hi');
+    if(+a.value>+b.value){ if(t.id==='f-lo') a.value=b.value; else b.value=a.value; }
+    UI.min=+a.value>UI.ovrLo?a.value:''; UI.max=+b.value<UI.ovrHi?b.value:''; UI.limit=40; ovrFill();
+    clearTimeout(UI.ovrT); UI.ovrT=setTimeout(results,120);
+   return; }
+
   var t=e.target;
   if(t.id==='q'){UI.q=t.value; UI.limit=40; results();}
   else if(t.id==='kq'){UI.kq=t.value; var g=document.getElementById('kgroups'); if(g) g.innerHTML=kGroups(owned());}
@@ -1488,7 +1528,6 @@ view.addEventListener('change',function(e){
   if(tab()==='setup'&&e.target.id&&/^(s-(coach|captain|prio|strict|dhand|cap|ap|rate)|w-.*)$/.test(e.target.id)) setTimeout(function(){ if(tab()==='setup') viewSetup(); },0);
   var t=e.target, d=t.dataset;
   if(t.id==='f-type'){UI.type=t.value; UI.limit=40; results();}
-  else if(t.id==='f-min'){UI.min=t.value; UI.limit=40; results();}
   else if(t.id==='f-sort'){UI.sort=t.value; UI.limit=40; results();}
   else if(t.id==='f-xf'){UI.xf=t.value; UI.limit=40; results();}
   else if(t.id==='f-hgt'){UI.hgt=t.value; UI.limit=40; results();}
