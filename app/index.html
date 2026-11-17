@@ -323,6 +323,10 @@ details.sg .field{margin-bottom:12px}
 .cmp .win{color:var(--ovr);font-weight:700}
 .cmphead{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;text-align:center}
 .cmphead>div{min-width:0}
+.verdict{background:rgba(14,19,26,.7);border:1px solid var(--line);border-left:3px solid var(--ovr);padding:12px 14px;margin:0 0 14px}
+.verdict .vh{font:700 12px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin-bottom:6px}
+.verdict .vbig{margin:0 0 6px;font-size:16px} .verdict .vbig b{color:var(--ovr)}
+.verdict ul{margin:0;padding-left:18px;font-size:13.5px;color:var(--ice)} .verdict li{margin:3px 0}
 .cmphead .logos,.cmphead .meta{justify-content:center;flex-wrap:wrap}
 .cmphead .lgi em{display:none}
 .cmphead .lbempty{width:min(150px,100%);margin:0 auto}
@@ -1294,12 +1298,48 @@ function viewReihen(){
 
 /* ---------- Analyse ---------- */
 function grpAvg(c,g){var idx=HUT.GROUPS[g], s=0; idx.forEach(function(i){s+=c.a[i];}); return s/idx.length;}
+/* Einschaetzung: Werte und Passung in die eigene Aufstellung */
+function verdictHtml(a,b){
+  var v=valFn(), va=v(a), vb=v(b), na=nice(a.n), nb=nice(b.n), pros={a:[],b:[]};
+  if(a.k==='s') Object.keys(GRP).forEach(function(g){ var x=grpAvg(a,g), y=grpAvg(b,g); if(Math.abs(x-y)>=1) pros[x>y?'a':'b'].push(GRP[g]); });
+  var sd=(a.sal||0)-(b.sal||0); if(Math.abs(sd)>=0.5) pros[sd<0?'a':'b'].push(money(Math.abs(sd))+' günstiger');
+  var hd=HUT.heightCm(a.hgt)-HUT.heightCm(b.hgt); if(Math.abs(hd)>=4) pros[hd>0?'a':'b'].push('größer');
+  var fit=null;
+  if(owned().length){
+    var base=owned().filter(function(c){return key(c)!==key(a)&&key(c)!==key(b);}), o=opts();
+    var ra=HUT.optimize(D,base.concat([a]),o), rb=HUT.optimize(D,base.concat([b]),o);
+    var ina=!!findSlot(ra,key(a)), inb=!!findSlot(rb,key(b));
+    fit={d:ra.totals.raw-rb.totals.raw, avg:ra.totals.avg-rb.totals.avg, ap:ra.totals.ap-rb.totals.ap, sb:ra.totals.salBoost-rb.totals.salBoost, ina:ina, inb:inb};
+  }
+  var winV=Math.abs(va-vb)<0.3?null:(va>vb?'a':'b');
+  var winF=fit&&(Math.abs(fit.avg)>=0.05||fit.ap||Math.abs(fit.sb)>=0.05||fit.ina!==fit.inb)&&Math.abs(fit.d)>0.5?(fit.d>0?'a':'b'):null;
+  var win=winF||winV, name=function(x){return esc(x==='a'?na:nb);};
+  var h='<div class="verdict"><div class="vh">Einschätzung</div>';
+  h+='<p class="vbig">'+(win?'<b>'+name(win)+'</b> ist die bessere Wahl'+(winF&&winV&&winF!==winV?' für deinen Kader':''):'Beide sind etwa gleich stark')+'</p><ul>';
+  h+='<li>Wert'+(S.useRating?' (deine Gewichtung)':'')+': '+esc(na)+' '+va.toFixed(1).replace('.',',')+' · '+esc(nb)+' '+vb.toFixed(1).replace('.',',')+'</li>';
+  if(fit){
+    var who=fit.avg>=0?na:nb;
+    if(!fit.ina&&!fit.inb) h+='<li>In deiner Aufstellung würde keiner der beiden spielen.</li>';
+    else if(fit.ina!==fit.inb) h+='<li>In deiner Aufstellung würde nur '+esc(fit.ina?na:nb)+' spielen.</li>';
+    else{
+      var parts=[];
+      parts.push(Math.abs(fit.avg)<0.05?'Ø OVR gleich':'Ø OVR +'+Math.abs(fit.avg).toFixed(1).replace('.',',')+' mit '+esc(who));
+      if(fit.ap) parts.push('AP +'+Math.abs(fit.ap)+' mit '+esc(fit.ap>0?na:nb));
+      if(Math.abs(fit.sb)>=0.05) parts.push('Cap-Bonus +'+money(Math.abs(fit.sb))+' mit '+esc(fit.sb>0?na:nb));
+      h+='<li>In deiner Aufstellung (mit Boni): '+parts.join(', ')+'</li>';
+    }
+  }
+  if(pros.a.length) h+='<li>Für '+esc(na)+': '+pros.a.join(', ')+'</li>';
+  if(pros.b.length) h+='<li>Für '+esc(nb)+': '+pros.b.join(', ')+'</li>';
+  return h+'</ul></div>';
+}
 function cmpHtml(){
   var a=byKey[UI.cmp[0]], b=byKey[UI.cmp[1]];
   var head=function(c,i){return c?'<div><div data-card="'+key(c)+'">'+img(c)+'</div><div class="nm" style="margin:6px 0 4px">'+esc(nice(c.n))+'</div>'+sub(c)+'<button class="chip" data-cmpx="'+i+'" style="margin-top:8px">Entfernen</button></div>':'<button class="lbempty" data-cmppick="'+i+'"><span>+</span>Karte '+(i+1)+'</button>';};
   var h='<div class="cmphead">'+head(a,0)+head(b,1)+'</div>';
   if(!a||!b) return h;
   if(a.k!==b.k) return h+'<p class="note warn">Feldspieler und Goalies haben unterschiedliche Werte und lassen sich nicht vergleichen.</p>';
+  h+=verdictHtml(a,b);
   var row=function(l,x,y,dec){var f=function(v){return dec?v.toFixed(1):v;}; return '<div class="l'+(x>y?' win':'')+'">'+f(x)+'</div><div class="m">'+l+'</div><div class="'+(y>x?'win':'')+'">'+f(y)+'</div>';};
   h+='<div class="cmp">'+row('OVR',a.ovr,b.ovr)+row('aOVR',a.aovr||0,b.aovr||0,true)+'<div class="l">'+money(a.sal||0)+'</div><div class="m">GEHALT</div><div>'+money(b.sal||0)+'</div>';
   if(a.k==='s'){
