@@ -97,7 +97,13 @@ p{margin:0 0 10px}
 .lsum{color:var(--ovr);font-weight:600;font-size:13px}
 .bpbox{display:flex;flex-direction:column;gap:10px;margin:10px 0}
 .bpbox .seg{margin:0}
-.bpm .mc{width:58px}
+.bpm .mc{width:46px}
+.bpr{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:10px 0;border-top:1px solid var(--line);align-items:start}
+.bpr .mini{margin:0;flex-wrap:nowrap}
+.bprt{min-width:0;display:flex;flex-direction:column;gap:4px}
+.bprh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.bprh .lsum{font-size:16px}
+.btn.bpuse{align-self:flex-start;padding:4px 10px;font-size:11px;min-height:0;margin-top:2px;border-radius:3px}
 .pkcand{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
 .pkc2{position:relative}
 .pkc2 .mc,.pkr .mc{position:relative;width:58px;aspect-ratio:804/1128;padding:0;border:0;background:var(--surface2);overflow:hidden;display:block;cursor:pointer}
@@ -1427,14 +1433,18 @@ function lbHtml(){
   }
   if(st.bp){
     if(!st.bp.length) h+='<p class="note">Keine passenden Partner gefunden.</p>';
-    else h+='<div class="nmx"><div class="nmh"><strong>Beste Partner</strong>'+(st.bp.length>1?'<span class="small mute">'+st.bp.length+' Varianten ›</span>':'')+'</div><div class="nmslides">'+st.bp.map(function(b,ix){
-      var l=b.line;
-      return '<div class="nms"><div class="nmh"><div class="pills">'+pillsFor(l.boosts)+'</div>'+(st.bp.length>1?'<span class="small mute">'+(ix+1)+' / '+st.bp.length+'</span>':'')+'</div>'+
-        '<div class="mini bpm">'+b.add.map(function(c){return '<button class="mc'+(isOwned(c)?' own':'')+'" data-card="'+key(c)+'">'+img(c)+'<i>'+c.ovr+'</i></button>';}).join('')+'</div>'+
-        '<div class="small">'+b.add.map(function(c){return esc(nice(c.n))+' ('+c.ovr+' '+esc(c.pos)+')';}).join(', ')+' · '+lineSum(l)+'</div>'+
-        l.active.map(function(c){return '<div class="combo">'+(c.src==='Coach'?'Coach: ':'')+comboHtml(c)+' <b>'+boostLabel(c)+'</b></div>';}).join('')+
-        '<p><button class="btn ghost sm" data-bpuse="'+ix+'">In den Baukasten übernehmen</button></p></div>';
-    }).join('')+'</div></div>';
+    else{
+      var avgOf=function(l){var n=l.players.length; return (l.players.reduce(function(s,p){return s+p.ovr;},0)+l.boosts.overall*n)/n;};
+      var list=st.bp.slice().sort(function(a,b){return avgOf(b.line)-avgOf(a.line)||b.sc-a.sc;});
+      h+='<div class="lab" style="margin:14px 0 4px">Beste Partner · sortiert nach Ø OVR mit Boni</div>'+list.map(function(b){
+        var l=b.line, ix=st.bp.indexOf(b);
+        return '<div class="bpr"><div class="mini bpm">'+b.add.map(function(c){return '<button class="mc'+(isOwned(c)?' own':'')+'" data-card="'+key(c)+'">'+img(c)+'<i>'+c.ovr+'</i></button>';}).join('')+'</div>'+
+          '<div class="bprt"><div class="bprh"><b class="lsum">Ø '+avgOf(l).toFixed(1).replace('.',',')+'</b><div class="pills">'+pillsFor(l.boosts)+'</div></div>'+
+          '<div class="small">'+b.add.map(function(c){return esc(nice(c.n))+' <span class="mute">'+c.ovr+' '+esc(c.pos)+'</span>';}).join(', ')+'</div>'+
+          l.active.map(function(c){return '<div class="combo">'+(c.src==='Coach'?'Coach: ':'')+comboHtml(c)+' <b>'+boostLabel(c)+'</b></div>';}).join('')+
+          '<button class="btn ghost sm bpuse" data-bpuse="'+ix+'">Übernehmen</button></div></div>';
+      }).join('');
+    }
   }
   return h;
 }
@@ -1448,7 +1458,7 @@ function bpRun(){
   if(st.src==='all'){ var lo=+st.lo||0, hi=+st.hi||999; pool=D.cards.filter(function(c){return c.ovr>=lo&&c.ovr<=hi;}); }
   else { pool=owned(); if(!S.strict) slots=slots.map(function(){return isD?['LD','RD']:['LW','C','RW'];}); }
   var w=PRIO[S.prio]||PRIO.bal;
-  st.bp=HUT.bestPartners(D,fixed,slots,pool,{line:isD?'defense':'forwards',coach:S.coach,val:valFn(),w:w,n:5});
+  st.bp=HUT.bestPartners(D,fixed,slots,pool,{line:isD?'defense':'forwards',coach:S.coach,val:valFn(),w:w,n:8});
 }
 function openCardPick(slot,cb,anyPos){
   var el=document.getElementById('picker'), st=lbState(), isD=st.t==='d';
