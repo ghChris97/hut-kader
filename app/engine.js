@@ -568,7 +568,43 @@
     return out.map(function (p) { return p || rest.shift(); });
   }
 
-  root.HUT = { optimize: optimize, comboMatches: comboMatches, evalLine: evalLine, combosFor: combosFor, upgrades: upgrades,
+  /* Beste Reihenpartner: feste Spieler + freie Plaetze aus einem Pool.
+     slots: Liste erlaubter Positionen je freiem Platz (leer = alle).
+     Kandidaten je Platz: staerkste Karten + passende Karten fuer jeden Combo-Slot. */
+  function bestPartners(data, fixed, slots, pool, opts) {
+    var line = opts.line, combos = combosFor(data, line, opts.coach), val = opts.val || function (p) { return p.ovr; };
+    var w = opts.w || { ovr: 1, ap: 0.5, sal: 0.25 }, n = opts.n || 3, per = opts.per || 2, cap = opts.cap || (slots.length >= 3 ? 34 : 140);
+    var used = {}; fixed.forEach(function (p) { used[p.n] = 1; });
+    var cand = slots.map(function (pos) {
+      var ok = pool.filter(function (c) { return c.k === 's' && !used[c.n] && (!pos.length || pos.indexOf(c.pos) >= 0); });
+      ok.sort(function (a, b) { return val(b) - val(a); });
+      var pick = {}, out = [];
+      var add = function (c) { var k = key(c); if (!pick[k]) { pick[k] = 1; out.push(c); } };
+      ok.slice(0, 15).forEach(add);
+      combos.forEach(function (cb) { cb.slots.forEach(function (sl) { var m = 0; for (var i = 0; i < ok.length && m < per; i++) if (slotOk(ok[i], sl)) { add(ok[i]); m++; } }); });
+      out.sort(function (a, b) { return val(b) - val(a); });
+      return out.slice(0, cap);
+    });
+    var best = [], seen = {};
+    var score = function (l) { return w.ovr * (l.val + l.boosts.overall * l.players.length) + w.ap * l.boosts.ability_points + w.sal * l.boosts.salary; };
+    var rec = function (i, chosen) {
+      if (i === slots.length) {
+        var names = {}; for (var j = 0; j < chosen.length; j++) { if (names[chosen[j].n]) return; names[chosen[j].n] = 1; }
+        var ps = fixed.concat(chosen), l = evalLine(ps, combos, val), sc = score(l);
+        var sig = chosen.map(key).sort().join('|'); if (seen[sig]) return; seen[sig] = 1;
+        if (best.length < n || sc > best[best.length - 1].sc) {
+          best.push({ sc: sc, add: chosen.slice(), line: l });
+          best.sort(function (a, b) { return b.sc - a.sc; }); if (best.length > n) best.pop();
+        }
+        return;
+      }
+      cand[i].forEach(function (c) { chosen.push(c); rec(i + 1, chosen); chosen.pop(); });
+    };
+    rec(0, []);
+    return best;
+  }
+
+  root.HUT = { bestPartners: bestPartners, optimize: optimize, comboMatches: comboMatches, evalLine: evalLine, combosFor: combosFor, upgrades: upgrades,
     nearMisses: nearMisses, fillers: fillers, specialTeams: specialTeams, rating: rating, evaluate: evaluate,
     lineupPlayers: lineupPlayers, key: key, GROUPS: GROUPS, heightCm: heightCm, sizeScore: sizeScore, sidesD: sidesD, mixedPair: mixedPair,
     captainTeams: captainTeams, DIVISIONS: DIVISIONS, bonusUpgrades: bonusUpgrades };

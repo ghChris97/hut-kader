@@ -90,6 +90,13 @@ p{margin:0 0 10px}
 .pki .pkn{color:var(--mute);font-size:12.5px}
 .pki.on{background:rgba(47,196,238,.12)} .pki.on .pkl{color:var(--blue);font-weight:600}
 .pkc{padding:6px}
+.antabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:rgba(14,19,26,.6);border:1px solid var(--line);padding:4px}
+.antabs button{border:0;background:none;color:var(--mute);padding:9px 2px;font:700 12.5px/1.1 var(--display);letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+.antabs button[aria-selected=true]{background:#fff;color:#0d1117}
+.anlead{font-size:13px;color:var(--mute);margin:10px 0 12px}
+.bpbox{display:flex;flex-direction:column;gap:10px;margin:10px 0}
+.bpbox .seg{margin:0}
+.bpm .mc{width:58px}
 .pkcand{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
 .pkc2{position:relative}
 .pkc2 .mc,.pkr .mc{position:relative;width:58px;aspect-ratio:804/1128;padding:0;border:0;background:var(--surface2);overflow:hidden;display:block;cursor:pointer}
@@ -1324,7 +1331,11 @@ function upHtml(){
   }).join('')+'</div><p class="small mute" style="margin-top:8px">'+(bonus?'Gerechnet wird je Karte der beste einzelne Tausch in deiner aktuellen Aufstellung, mit Trainer- und Captain-Boni.':'Punkte = Zugewinn in der Wertung des Optimierers (1 Punkt entspricht 1 OVR bei einem Spieler). Gerechnet wird je Karte der beste einzelne Tausch. Captain-Boni bleiben hier außen vor.')+'</p>';
 }
 function viewAnalyse(){
-  view.innerHTML=sharedHtml()+'<h2>Auswahl-Pack: wen nehmen?</h2>'+pkHtml()+'<h2>Reihen-Baukasten</h2>'+lbHtml()+'<h2>Vorschläge für neue Karten</h2>'+upHtml()+'<h2>Kartenvergleich</h2>'+cmpHtml(); dualFill('u');
+  var an=UI.an||'pack', tabs=[['pack','Auswahl-Pack','Spieler aus einem Auswahl-Pack eintragen (Karte oder Foto). Die App stellt deine Aufstellung mit jedem einzeln neu auf und sagt, wer am meisten bringt.'],['lb','Baukasten','Eine Reihe frei zusammenstellen und beste Partner finden'],['up','Neue Karten','Welche Karten deine Aufstellung verbessern'],['cmp','Vergleich','Karten Wert für Wert vergleichen']];
+  var cur=tabs.filter(function(t){return t[0]===an;})[0]||tabs[0];
+  var h=sharedHtml()+'<div class="antabs" role="tablist">'+tabs.map(function(t){return '<button role="tab" data-an="'+t[0]+'" aria-selected="'+(t[0]===cur[0])+'">'+t[1]+'</button>';}).join('')+'</div><p class="anlead">'+cur[2]+'</p>';
+  h+=cur[0]==='pack'?pkHtml():cur[0]==='lb'?lbHtml():cur[0]==='up'?upHtml():cmpHtml();
+  view.innerHTML=h; if(cur[0]==='up') dualFill('u'); if(cur[0]==='lb') dualFill('b');
 }
 /* Auswahl-Pack: welche Karte bringt der Aufstellung am meisten? */
 function pkState(){ if(!UI.pk) UI.pk={k:[],res:null}; return UI.pk; }
@@ -1343,7 +1354,7 @@ function pkRank(){
 }
 function pkHtml(){
   if(!owned().length) return '<p class="small mute">Lege zuerst deinen Kader an.</p>';
-  var st=pkState(), h='<p class="small mute" style="margin-top:0">Trag die Spieler aus dem Auswahl-Pack ein. Die App stellt deine Aufstellung mit jedem einzeln neu auf und sagt, wer am meisten bringt.</p>';
+  var st=pkState(), h='';
   h+='<div class="pkcand">'+st.k.map(function(k,i){var c=byKey[k]; return c?'<div class="pkc2"><button class="mc" data-card="'+k+'">'+img(c)+'<i>'+c.ovr+'</i></button><button class="pkdel" data-pkdel="'+i+'" aria-label="'+esc(nice(c.n))+' entfernen">'+IC.x+'</button></div>':'';}).join('')+
     '<button class="pkadd" id="pk-add"><span>+</span>Karte</button><label class="pkadd" for="pk-file"><span>'+IC.camera+'</span>Foto</label><input type="file" id="pk-file" accept="image/*" hidden></div>';
   if(st.msg) h+='<p class="small mute">'+esc(st.msg)+'</p>';
@@ -1401,10 +1412,37 @@ function lbHtml(){
       if(!l.active.length) h+='<p class="small mute">Mit dieser Kombination greift kein Bonus'+(S.coach?' (auch keiner vom Coach '+esc(S.coach)+')':'')+'.</p>';
       h+='<p class="small">Gehalt der Reihe: <b style="color:var(--sal)">'+money(ps.reduce(function(s,p){return s+(p.sal||0);},0))+'</b></p>';
     }
-  } else h+='<p class="small mute">Tippe auf einen Platz und wähle eine beliebige Karte, auch eine, die du nicht hast. Die Boni rechnet die App mit deinem Coach aus dem Setup.</p>';
+  } else if(!ps.some(Boolean)) h+='<p class="small mute">Tippe auf einen Platz und wähle eine Karte, auch eine, die du nicht hast. Oder setz einen Spieler und lass die App die besten Partner suchen.</p>';
+  if(ps.some(Boolean)&&!ps.every(Boolean)){
+    ovrBounds(); var blo=+st.lo||UI.ovrLo, bhi=+st.hi||UI.ovrHi;
+    h+='<div class="bpbox"><div class="seg" role="group" aria-label="Woher die Partner kommen"><button id="bp-own" aria-pressed="'+(st.src!=='all')+'">Aus meinem Kader</button><button id="bp-all" aria-pressed="'+(st.src==='all')+'">Alle Karten</button></div>'+
+      (st.src==='all'?'<div class="ovrr"><b id="b-lab">OVR <span>'+blo+'–'+bhi+'</span></b><div class="dual"><div class="trk"></div><div class="fill" id="b-fill"></div><input type="range" id="b-lo" min="'+UI.ovrLo+'" max="'+UI.ovrHi+'" value="'+blo+'" aria-label="OVR mindestens"><input type="range" id="b-hi" min="'+UI.ovrLo+'" max="'+UI.ovrHi+'" value="'+bhi+'" aria-label="OVR höchstens"></div></div>':'')+
+      '<button class="btn" id="bp-run" style="width:100%">Beste Partner finden</button></div>';
+  }
+  if(st.bp){
+    if(!st.bp.length) h+='<p class="note">Keine passenden Partner gefunden.</p>';
+    else h+='<div class="nmx"><div class="nmh"><strong>Beste Partner</strong>'+(st.bp.length>1?'<span class="small mute">'+st.bp.length+' Varianten ›</span>':'')+'</div><div class="nmslides">'+st.bp.map(function(b,ix){
+      var l=b.line;
+      return '<div class="nms"><div class="nmh"><div class="pills">'+pillsFor(l.boosts)+'</div>'+(st.bp.length>1?'<span class="small mute">'+(ix+1)+' / '+st.bp.length+'</span>':'')+'</div>'+
+        '<div class="mini bpm">'+b.add.map(function(c){return '<button class="mc'+(isOwned(c)?' own':'')+'" data-card="'+key(c)+'">'+img(c)+'<i>'+c.ovr+'</i></button>';}).join('')+'</div>'+
+        '<div class="small">'+b.add.map(function(c){return esc(nice(c.n))+' ('+c.ovr+' '+esc(c.pos)+')';}).join(', ')+'</div>'+
+        l.active.map(function(c){return '<div class="combo">'+(c.src==='Coach'?'Coach: ':'')+comboHtml(c)+' <b>'+boostLabel(c)+'</b></div>';}).join('')+
+        '<p><button class="btn ghost sm" data-bpuse="'+ix+'">In den Baukasten übernehmen</button></p></div>';
+    }).join('')+'</div></div>';
+  }
   return h;
 }
 var PICKCB=null;
+function bpRun(){
+  var st=lbState(), isD=st.t==='d', n=isD?2:3, posOf=isD?[['LD','RD'],['LD','RD']]:[['LW'],['C'],['RW']];
+  var fixed=[], slots=[];
+  for(var i=0;i<n;i++){ var c=st.k[i]&&byKey[st.k[i]]; if(c) fixed.push(c); else slots.push(posOf[i]); }
+  var pool;
+  if(st.src==='all'){ var lo=+st.lo||0, hi=+st.hi||999; pool=D.cards.filter(function(c){return c.ovr>=lo&&c.ovr<=hi;}); }
+  else { pool=owned(); if(!S.strict) slots=slots.map(function(){return isD?['LD','RD']:['LW','C','RW'];}); }
+  var w=PRIO[S.prio]||PRIO.bal;
+  st.bp=HUT.bestPartners(D,fixed,slots,pool,{line:isD?'defense':'forwards',coach:S.coach,val:valFn(),w:w,n:5});
+}
 function openCardPick(slot,cb,anyPos){
   var el=document.getElementById('picker'), st=lbState(), isD=st.t==='d';
   PICKCB=cb||null;
@@ -1422,12 +1460,17 @@ function openCardPick(slot,cb,anyPos){
   q.addEventListener('input',draw); draw(); setTimeout(function(){q.focus();},50);
 }
 document.addEventListener('click',function(e){
-  var t=e.target.closest&&e.target.closest('[data-lbslot],[data-cpick],[data-lbcopy],#lb-f,#lb-d'); if(!t) return;
+  var t=e.target.closest&&e.target.closest('[data-lbslot],[data-cpick],[data-lbcopy],#lb-f,#lb-d,#bp-own,#bp-all,#bp-run,[data-bpuse],[data-an]'); if(!t) return;
+  if(t.dataset.an){ UI.an=t.dataset.an; viewAnalyse(); window.scrollTo(0,0); return; }
+  var st0=lbState();
+  if(t.id==='bp-own'||t.id==='bp-all'){ st0.src=t.id==='bp-all'?'all':'own'; st0.bp=null; viewAnalyse(); return; }
+  if(t.dataset.bpuse!=null){ var bb=st0.bp[+t.dataset.bpuse], n0=st0.t==='d'?2:3, q=bb.add.slice(); for(var z=0;z<n0;z++) if(!st0.k[z]) st0.k[z]=key(q.shift()); st0.bp=null; viewAnalyse(); return; }
+  if(t.id==='bp-run'){ t.textContent='Suche …'; setTimeout(function(){ bpRun(); viewAnalyse(); },30); return; }
   var st=lbState(), el=document.getElementById('picker');
-  if(t.id==='lb-f'||t.id==='lb-d'){ st.t=t.id==='lb-d'?'d':'f'; st.k=[null,null,null]; viewAnalyse(); return; }
-  if(t.dataset.lbcopy!=null){ var i=+t.dataset.lbcopy; if(i<0) st.k=[null,null,null]; else { var l=(st.t==='d'?result().defense:result().forwards)[i]; var ps=st.t==='d'?HUT.sidesD(l.players,S.dHand):l.players; st.k=ps.map(key).concat([null]).slice(0,3);} viewAnalyse(); return; }
+  if(t.id==='lb-f'||t.id==='lb-d'){ st.t=t.id==='lb-d'?'d':'f'; st.k=[null,null,null]; st.bp=null; viewAnalyse(); return; }
+  if(t.dataset.lbcopy!=null){ st.bp=null; var i=+t.dataset.lbcopy; if(i<0) st.k=[null,null,null]; else { var l=(st.t==='d'?result().defense:result().forwards)[i]; var ps=st.t==='d'?HUT.sidesD(l.players,S.dHand):l.players; st.k=ps.map(key).concat([null]).slice(0,3);} viewAnalyse(); return; }
   if(t.dataset.lbslot!=null){ e.preventDefault(); e.stopPropagation(); openCardPick(+t.dataset.lbslot); return; }
-  if(t.dataset.cpick){ el.classList.remove('on'); if(PICKCB){ var cb=PICKCB; PICKCB=null; cb(t.dataset.cpick); return; } st.k[+el.dataset.slot]=t.dataset.cpick; viewAnalyse(); }
+  if(t.dataset.cpick){ el.classList.remove('on'); if(PICKCB){ var cb=PICKCB; PICKCB=null; cb(t.dataset.cpick); return; } st.k[+el.dataset.slot]=t.dataset.cpick; st.bp=null; viewAnalyse(); }
 },true);
 
 /* ---------- Setup ---------- */
@@ -1762,6 +1805,11 @@ document.addEventListener('click',function(e){
 });
 view.addEventListener('input',function(e){
   var t0=e.target;
+  if(t0.id==='b-lo'||t0.id==='b-hi'){
+    var ba=document.getElementById('b-lo'), bb2=document.getElementById('b-hi'), bs=lbState();
+    if(+ba.value>+bb2.value){ if(t0.id==='b-lo') ba.value=bb2.value; else bb2.value=ba.value; }
+    bs.lo=+ba.value>UI.ovrLo?ba.value:''; bs.hi=+bb2.value<UI.ovrHi?bb2.value:''; dualFill('b'); return;
+  }
   if(t0.id==='u-lo'||t0.id==='u-hi'){
     var ua=document.getElementById('u-lo'), ub=document.getElementById('u-hi');
     if(+ua.value>+ub.value){ if(t0.id==='u-lo') ua.value=ub.value; else ub.value=ua.value; }
