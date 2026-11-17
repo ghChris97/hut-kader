@@ -89,6 +89,16 @@ p{margin:0 0 10px}
 .pki .pkl{flex:1;min-width:0} .pki em{font-style:normal;color:var(--mute);font-size:12.5px}
 .pki .pkn{color:var(--mute);font-size:12.5px}
 .pki.on{background:rgba(47,196,238,.12)} .pki.on .pkl{color:var(--blue);font-weight:600}
+.pkc{padding:6px}
+.pkimg{width:34px;aspect-ratio:804/1128;flex:none;overflow:hidden;background:var(--surface2)}
+.pkimg img{width:100%;height:100%;object-fit:cover;display:block}
+.lbslots{margin-bottom:8px}
+.lbs{min-width:0}
+.lbpick{width:100%}
+.lbempty{width:100%;aspect-ratio:804/1128;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:2px dashed var(--line2);background:rgba(255,255,255,.03);color:var(--mute);font:700 14px/1 var(--display);letter-spacing:.1em;cursor:pointer}
+.lbempty span{font-size:34px;line-height:1;color:var(--ice)}
+.fit-h{font:700 17px/1.2 var(--display);letter-spacing:.06em;text-transform:uppercase;margin:16px 0 8px}
+.rstat b.up{color:var(--sal)!important} .rstat b.dn{color:#ff6b62!important}
 .pkg{font:700 11.5px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--mute);padding:14px 6px 6px}
 .fsel3 select{padding:8px 22px 8px 9px;font-size:13.5px;min-width:0;background-position:right 6px center}
 .ovrr{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:2px 2px}
@@ -598,6 +608,7 @@ var IC={
   share:'<svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/></svg>',
   pin:'<svg viewBox="0 0 24 24"><path d="M9 4h6l-1 6 3 3H7l3-3z"/><path d="M12 13v7"/></svg>',
   ban:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M6.5 6.5l11 11"/></svg>',
+  lines:'<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
   cmp:'<svg viewBox="0 0 24 24"><path d="M8 4v16M16 4v16M4 8h4M16 16h4"/></svg>',
   cards:'<svg viewBox="0 0 24 24"><rect x="4" y="3" width="12" height="16" rx="2"/><path d="M8 21h10a2 2 0 0 0 2-2V7"/></svg>',
   people:'<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.8 14.3c2.2.2 3.9 1.8 4.6 4.7"/></svg>'
@@ -669,11 +680,12 @@ function sheetHtml(c){
   var b='';
   if(!SHARED) b+='<button class="btn'+(own?' ghost':'')+' sm" data-tg="'+k+'">'+(own?IC.check+'Im Kader':IC.plus+'Zum Kader')+'</button>';
   b+='<button class="btn ghost sm" data-cmp="'+k+'">'+IC.cmp+'Vergleichen</button>';
+  if(!own&&owned().length) b+='<button class="btn ghost sm" data-fit="'+k+'">'+IC.lines+'In meinen Reihen testen</button>';
   if(!SHARED&&own){
     b+='<button class="btn ghost sm" data-lock="'+k+'" aria-pressed="'+!!V.locks[k]+'">'+IC.pin+(V.locks[k]?'Fixierung lösen':'Fixieren')+'</button>'+
        '<button class="btn ghost sm" data-ban="'+k+'" aria-pressed="'+!!V.bans[k]+'">'+IC.ban+(V.bans[k]?'Sperre lösen':'Sperren')+'</button>';
   }
-  h+='<div class="actions">'+b+'</div>';
+  h+='<div class="actions">'+b+'</div><div id="fit"></div>';
   if(c.xf&&c.xf.length){
     h+='<h2>X-Factors</h2><div class="card">'+c.xf.map(function(x){
       var i=D.xf[x]||{n:'X-Factor '+x,t:'',ap:'?',d:'',e:[]};
@@ -701,6 +713,34 @@ function sheetHtml(c){
   return h+'</div>';
 }
 var sheet=document.getElementById('sheet');
+/* Wie passt eine fremde Karte in meine Aufstellung? */
+function findSlot(r,k){
+  var f=-1,d=-1,g=-1;
+  r.forwards.forEach(function(l,i){ if(l.players.some(function(p){return key(p)===k;})) f=i; });
+  r.defense.forEach(function(l,i){ if(l.players.some(function(p){return key(p)===k;})) d=i; });
+  r.goalies.forEach(function(p,i){ if(key(p)===k) g=i; });
+  return f>=0?{t:'f',i:f}:d>=0?{t:'d',i:d}:g>=0?{t:'g',i:g}:null;
+}
+function fitHtml(k){
+  var c=byKey[k], base=result(), o=opts(); o.locks=Object.assign({},o.locks); o.locks[k]=1;
+  var r2=HUT.optimize(D,owned().concat([c]),o), at=findSlot(r2,k);
+  if(!at) return '<p class="note warn">Die Karte passt mit deinen Einstellungen nicht in die Aufstellung (z. B. feste Positionen).</p>';
+  var inA={}, inB={}; HUT.lineupPlayers(base).forEach(function(p){inA[key(p)]=p;}); HUT.lineupPlayers(r2).forEach(function(p){inB[key(p)]=p;});
+  var out=Object.keys(inA).filter(function(x){return !inB[x];}).map(function(x){return inA[x];});
+  var t1=base.totals, t2=r2.totals, d=function(v,dig,unit){ var s=(v>0?'+':'')+(dig?v.toFixed(dig):Math.round(v)); return '<b class="'+(v>0.0001?'up':v<-0.0001?'dn':'')+'">'+s.replace('.',',')+(unit||'')+'</b>'; };
+  var title=at.t==='f'?(at.i+1)+'. Reihe':at.t==='d'?(at.i+1)+'. Paar':(at.i?'Backup':'Starting')+'-Goalie';
+  var h='<h3 class="fit-h">So passt '+esc(nice(c.n))+' rein</h3>'+
+    '<div class="rstat"><div class="o">'+d(t2.avg-t1.avg,1)+'<span>Ø OVR</span></div><div class="a">'+d(t2.ap-t1.ap)+'<span>AP</span></div><div class="s">'+d((t2.sal-t1.sal),1,'M')+'<span>Gehalt</span></div><div class="o">'+d(t2.boostOvr-t1.boostOvr)+'<span>OVR-Boni</span></div></div>'+
+    '<p class="small">Landet in: <b>'+title+'</b>'+(out.length?' · raus: '+out.map(function(p){return esc(nice(p.n))+' ('+p.ovr+')';}).join(', '):'')+'</p>';
+  if(at.t!=='g'){
+    var L1=(at.t==='f'?base.forwards:base.defense)[at.i], L2=(at.t==='f'?r2.forwards:r2.defense)[at.i];
+    if(L1) h+='<div class="lab">Vorher</div>'+lineHtml(title,L1,at.t==='d');
+    h+='<div class="lab" style="margin-top:8px">Nachher</div>'+lineHtml(title,L2,at.t==='d');
+  }
+  if(r2.capFailed||(base.capBase&&t2.sal>base.capBase+t2.salBoost+1e-9)) h+='<p class="note warn">Mit dieser Karte wird das Cap überschritten.</p>';
+  h+='<p class="small mute">Der Optimierer stellt die ganze Aufstellung mit der Karte neu auf, deshalb können sich auch andere Reihen ändern.</p>';
+  return h;
+}
 function openCard(k,replace){
   var c=byKey[k]; if(!c) return;
   var was=!!CARD; CARD=k; sheet.innerHTML=sheetHtml(c); sheet.scrollTop=0;
@@ -1271,8 +1311,59 @@ function upHtml(){
   }).join('')+'</div><p class="small mute" style="margin-top:8px">'+(bonus?'Gerechnet wird je Karte der beste einzelne Tausch in deiner aktuellen Aufstellung, mit Trainer- und Captain-Boni.':'Punkte = Zugewinn in der Wertung des Optimierers (1 Punkt entspricht 1 OVR bei einem Spieler). Gerechnet wird je Karte der beste einzelne Tausch. Captain-Boni bleiben hier außen vor.')+'</p>';
 }
 function viewAnalyse(){
-  view.innerHTML=sharedHtml()+'<h2>Vorschläge für neue Karten</h2>'+upHtml()+'<h2>Kartenvergleich</h2>'+cmpHtml(); dualFill('u');
+  view.innerHTML=sharedHtml()+'<h2>Reihen-Baukasten</h2>'+lbHtml()+'<h2>Vorschläge für neue Karten</h2>'+upHtml()+'<h2>Kartenvergleich</h2>'+cmpHtml(); dualFill('u');
 }
+/* Reihen-Baukasten: eine Reihe aus beliebigen Karten */
+function lbState(){ if(!UI.lb) UI.lb={t:'f',k:[null,null,null]}; return UI.lb; }
+function lbHtml(){
+  var st=lbState(), isD=st.t==='d', n=isD?2:3, labs=isD?['LV','RV']:['LW','C','RW'];
+  var r=owned().length?result():null;
+  var h='<div class="rtop"><div class="seg" role="group" aria-label="Art der Reihe"><button id="lb-f" aria-pressed="'+!isD+'">Sturmreihe</button><button id="lb-d" aria-pressed="'+isD+'">Verteidigerpaar</button></div></div>';
+  if(r){ var ls=isD?r.defense:r.forwards; if(ls.length) h+='<div class="chips scroll" style="margin-bottom:8px"><span class="small mute" style="align-self:center;flex:none">Übernehmen:</span>'+ls.map(function(l,i){return '<button class="chip" data-lbcopy="'+i+'">'+(i+1)+(isD?'. Paar':'. Reihe')+'</button>';}).join('')+'<button class="chip" data-lbcopy="-1">Leeren</button></div>'; }
+  h+='<div class="players lbslots">';
+  for(var i=0;i<n;i++){
+    var c=st.k[i]&&byKey[st.k[i]];
+    h+='<div class="lbs">'+(c?plHtml(c,labs[i]+(isOwned(c)?' ✓':'')).replace('class="pl" data-card="'+key(c)+'"','class="pl lbpick" data-lbslot="'+i+'"'):
+      '<button class="lbempty" data-lbslot="'+i+'"><span>+</span>'+labs[i]+'</button>')+'</div>';
+  }
+  h+='</div>';
+  var ps=st.k.slice(0,n).map(function(x){return x&&byKey[x];});
+  if(ps.every(Boolean)){
+    var names={}, dup=ps.some(function(p){ if(names[p.n]) return true; names[p.n]=1; });
+    if(dup) h+='<p class="note warn">Ein Spieler darf nur einmal in der Reihe stehen.</p>';
+    else{
+      var l=HUT.evalLine(ps,HUT.combosFor(D,isD?'defense':'forwards',S.coach),valFn());
+      h+='<div class="line"><div class="linehead"><strong>Boni dieser Kombi</strong><div class="pills">'+pillsFor(l.boosts)+'</div></div>'+
+        l.active.map(function(c){return '<div class="combo">'+(c.src==='Coach'?'Coach: ':'')+comboHtml(c)+' <b>'+boostLabel(c)+'</b></div>';}).join('')+'</div>';
+      if(!l.active.length) h+='<p class="small mute">Mit dieser Kombination greift kein Bonus'+(S.coach?' (auch keiner vom Coach '+esc(S.coach)+')':'')+'.</p>';
+      h+='<p class="small">Gehalt der Reihe: <b style="color:var(--sal)">'+money(ps.reduce(function(s,p){return s+(p.sal||0);},0))+'</b></p>';
+    }
+  } else h+='<p class="small mute">Tippe auf einen Platz und wähle eine beliebige Karte, auch eine, die du nicht hast. Die Boni rechnet die App mit deinem Coach aus dem Setup.</p>';
+  return h;
+}
+function openCardPick(slot){
+  var el=document.getElementById('picker'), st=lbState(), isD=st.t==='d';
+  el.innerHTML='<div class="pkbg" data-pclose="1"></div><div class="pkbox" role="dialog" aria-modal="true" aria-label="Karte wählen"><div class="pkhead"><b>Karte wählen</b><button class="pkx" data-pclose="1" aria-label="Schließen">'+IC.x+'</button></div>'+
+    '<div class="searchwrap pks">'+IC.search+'<input type="search" id="cp-q" placeholder="Name, Team, Land oder Kartentyp" autocomplete="off"></div><div class="pklist" id="cp-list"></div></div>';
+  el.dataset.kind='card'; el.dataset.slot=slot; el.classList.add('on');
+  var q=document.getElementById('cp-q'), list=document.getElementById('cp-list');
+  var pool=D.cards.filter(function(c){return c.k==='s'&&(isD?['LD','RD']:['LW','C','RW']).indexOf(c.pos)>=0;});
+  var draw=function(){
+    var v=q.value.trim().toUpperCase(), ws=v?v.split(/\s+/):[];
+    var res=pool.filter(function(c){return ws.every(function(w){return searchText(c).indexOf(w)>=0;});});
+    res.sort(function(a,b){return (isOwned(b)?1:0)-(isOwned(a)?1:0)||b.ovr-a.ovr;});
+    list.innerHTML=res.slice(0,60).map(function(c){return '<button class="pki pkc" data-cpick="'+key(c)+'"><span class="pkimg">'+img(c)+'</span><span class="pkl">'+esc(nice(c.n))+' <em>'+c.ovr+' · '+esc(c.pos)+' · '+esc(c.tmn)+' · '+esc(c.ctn)+'</em></span>'+(isOwned(c)?'<span class="pkn">✓</span>':'')+'</button>';}).join('')||'<p class="small mute">Keine Karte gefunden.</p>';
+  };
+  q.addEventListener('input',draw); draw(); setTimeout(function(){q.focus();},50);
+}
+document.addEventListener('click',function(e){
+  var t=e.target.closest&&e.target.closest('[data-lbslot],[data-cpick],[data-lbcopy],#lb-f,#lb-d'); if(!t) return;
+  var st=lbState(), el=document.getElementById('picker');
+  if(t.id==='lb-f'||t.id==='lb-d'){ st.t=t.id==='lb-d'?'d':'f'; st.k=[null,null,null]; viewAnalyse(); return; }
+  if(t.dataset.lbcopy!=null){ var i=+t.dataset.lbcopy; if(i<0) st.k=[null,null,null]; else { var l=(st.t==='d'?result().defense:result().forwards)[i]; var ps=st.t==='d'?HUT.sidesD(l.players,S.dHand):l.players; st.k=ps.map(key).concat([null]).slice(0,3);} viewAnalyse(); return; }
+  if(t.dataset.lbslot!=null){ e.preventDefault(); e.stopPropagation(); openCardPick(+t.dataset.lbslot); return; }
+  if(t.dataset.cpick){ st.k[+el.dataset.slot]=t.dataset.cpick; el.classList.remove('on'); viewAnalyse(); }
+},true);
 
 /* ---------- Setup ---------- */
 function viewSetup(){
@@ -1541,6 +1632,7 @@ document.addEventListener('click',function(e){
   var d=b.dataset;
   if(d.close){closeCard(); return;}
   if(d.tg){ if(!SHARED&&isOwnedKey(d.tg)&&!askRemove(d.tg)) return; if(toggle(d.tg)){ if(tab()==='karten') results(); else render(); refreshSheet(); } return; }
+  if(d.fit){ var fe=document.getElementById('fit'); if(fe){ fe.innerHTML='<p class="small mute">Rechne …</p>'; setTimeout(function(){ fe.innerHTML=fitHtml(d.fit); fe.scrollIntoView({behavior:'smooth',block:'start'}); },30); } return; }
   if(d.rm){ if(!askRemove(d.rm)) return; toggle(d.rm); render(); return;}
   if(b.id==='sel-cancel'){UI.sel=null; viewKader(); return;}
   if(b.id==='sel-all'){owned().forEach(function(c){UI.sel[key(c)]=1;}); viewKader(); return;}
