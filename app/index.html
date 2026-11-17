@@ -90,8 +90,9 @@ p{margin:0 0 10px}
 .pki .pkn{color:var(--mute);font-size:12.5px}
 .pki.on{background:rgba(47,196,238,.12)} .pki.on .pkl{color:var(--blue);font-weight:600}
 .pkc{padding:6px}
-.antabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:rgba(14,19,26,.6);border:1px solid var(--line);padding:4px}
-.antabs button{border:0;background:none;color:var(--mute);padding:9px 2px;font:700 12.5px/1.1 var(--display);letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+.antabs{display:flex;overflow-x:auto;scrollbar-width:none;gap:4px;background:rgba(14,19,26,.6);border:1px solid var(--line);padding:4px}
+.antabs::-webkit-scrollbar{display:none}
+.antabs button{flex:1 0 auto;white-space:nowrap;padding-left:12px!important;padding-right:12px!important;border:0;background:none;color:var(--mute);padding:9px 2px;font:700 12.5px/1.1 var(--display);letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
 .antabs button[aria-selected=true]{background:#fff;color:#0d1117}
 .anlead{font-size:13px;color:var(--mute);margin:10px 0 12px}
 .lsum{color:var(--ovr);font-weight:600;font-size:13px}
@@ -1278,7 +1279,6 @@ function viewReihen(){
   if(bench.length) h+='<h2>Nicht aufgestellt ('+bench.length+')</h2><p class="small mute">'+bench.map(function(c){return esc(nice(c.n))+' '+c.ovr+' '+esc(c.pos)+(!SHARED&&V.bans[key(c)]?' (gesperrt)':'');}).join(' · ')+'</p>';
   h+='<details id="d-ap"'+(UI.dAp?' open':'')+'><summary>X-Factors &amp; Ability Points</summary><div>'+apHtml(r)+'</div></details>';
   if(!saved){
-    h+='<details id="d-nm"'+(UI.dNm?' open':'')+'><summary>Fehlt nur eine Karte</summary><div id="nm-body">'+(UI.dNm?nmHtml(r):'')+'</div></details>';
   }
   h+='<details id="d-st"'+(UI.dSt?' open':'')+'><summary>Powerplay und Unterzahl</summary><div>'+stHtml(r)+'</div></details>';
   h+='<p class="small mute" style="margin-top:16px">Priorität: '+esc(w.label)+'. '+(S.coach?'Coach: '+esc(S.coach)+'.':'Kein Coach gewählt.')+(S.useRating?' Eigene Bewertung aktiv.':'')+' Ändern unter Setup.</p>';
@@ -1343,10 +1343,10 @@ function upHtml(){
   }).join('')+'</div><p class="small mute" style="margin-top:8px">'+(bonus?'Gerechnet wird je Karte der beste einzelne Tausch in deiner aktuellen Aufstellung, mit Trainer- und Captain-Boni.':'Punkte = Zugewinn in der Wertung des Optimierers (1 Punkt entspricht 1 OVR bei einem Spieler). Gerechnet wird je Karte der beste einzelne Tausch. Captain-Boni bleiben hier außen vor.')+'</p>';
 }
 function viewAnalyse(){
-  var an=UI.an||'pack', tabs=[['pack','Auswahl-Pack','Spieler aus einem Auswahl-Pack eintragen (Karte oder Foto). Die App stellt deine Aufstellung mit jedem einzeln neu auf und sagt, wer am meisten bringt.'],['lb','Baukasten','Eine Reihe frei zusammenstellen und beste Partner finden'],['up','Neue Karten','Welche Karten deine Aufstellung verbessern'],['cmp','Vergleich','Zwei Karten Wert für Wert vergleichen. Tippe auf ein Feld und wähle eine Karte.']];
+  var an=UI.an||'pack', tabs=[['pack','Auswahl-Pack','Spieler aus einem Auswahl-Pack eintragen (Karte oder Foto). Die App stellt deine Aufstellung mit jedem einzeln neu auf und sagt, wer am meisten bringt.'],['lb','Baukasten','Eine Reihe frei zusammenstellen und beste Partner finden'],['nm','1 Karte fehlt','Reihen, denen genau eine Karte für einen weiteren Bonus fehlt'],['up','Neue Karten','Welche Karten deine Aufstellung verbessern'],['cmp','Vergleich','Zwei Karten Wert für Wert vergleichen. Tippe auf ein Feld und wähle eine Karte.']];
   var cur=tabs.filter(function(t){return t[0]===an;})[0]||tabs[0];
   var h=sharedHtml()+'<div class="antabs" role="tablist">'+tabs.map(function(t){return '<button role="tab" data-an="'+t[0]+'" aria-selected="'+(t[0]===cur[0])+'">'+t[1]+'</button>';}).join('')+'</div><p class="anlead">'+cur[2]+'</p>';
-  h+=cur[0]==='pack'?pkHtml():cur[0]==='lb'?lbHtml():cur[0]==='up'?upHtml():cmpHtml();
+  h+=cur[0]==='pack'?pkHtml():cur[0]==='lb'?lbHtml():cur[0]==='nm'?(owned().length?nmHtml(result()):'<p class="small mute">Lege zuerst deinen Kader an.</p>'):cur[0]==='up'?upHtml():cmpHtml();
   view.innerHTML=h; if(cur[0]==='up') dualFill('u'); if(cur[0]==='lb') dualFill('b');
 }
 /* Auswahl-Pack: welche Karte bringt der Aufstellung am meisten? */
