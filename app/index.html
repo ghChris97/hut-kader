@@ -1399,7 +1399,7 @@ function lbHtml(){
   h+='<div class="players lbslots">';
   for(var i=0;i<n;i++){
     var c=st.k[i]&&byKey[st.k[i]];
-    h+='<div class="lbs">'+(c?'<button class="kdel" data-lbclr="'+i+'" aria-label="'+esc(nice(c.n))+' abwählen">'+IC.x+'</button>':'')+(c?plHtml(c,labs[i]+(isOwned(c)?' ✓':'')).replace('class="pl" data-card="'+key(c)+'"','class="pl lbpick" data-lbslot="'+i+'"'):
+    h+='<div class="lbs">'+(c?'<button class="kdel" data-lbclr="'+i+'" aria-label="'+esc(nice(c.n))+' abwählen">'+IC.x+'</button>':'')+(c?plHtml(c,labs[i]+(isOwned(c)?' ✓':'')):
       '<button class="lbempty" data-lbslot="'+i+'"><span>+</span>'+labs[i]+'</button>')+'</div>';
   }
   h+='</div>';
