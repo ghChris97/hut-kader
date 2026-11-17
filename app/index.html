@@ -753,7 +753,7 @@ function viewKarten(){
     '<div class="searchwrap">'+IC.search+'<input type="search" id="q" placeholder="Name, Team, Land oder Kartentyp" aria-label="Suchen nach Name, Team, Land oder Kartentyp" value="'+esc(UI.q)+'" autocomplete="off"></div>'+
     '<div class="chips scroll fchips" role="group" aria-label="Position">'+pos.map(function(p){return '<button class="chip" data-pos="'+p[0]+'" aria-pressed="'+(UI.pos===p[0])+'">'+p[1]+'</button>';}).join('')+
       '<span class="fsep"></span><button class="chip" id="f-new" aria-pressed="'+UI.onlyNew+'">Neu '+nNew+'</button><button class="chip" id="f-mine" aria-pressed="'+UI.onlyMine+'">Meine</button></div>'+
-    '<div class="fsel3"><select id="f-type" aria-label="Kartentyp"><option value="">Kartentyp</option>'+types.map(function(t){return opt(t.abbr,t.name,UI.type);}).join('')+'</select>'+teamSelect()+natSelect()+'</div>'+
+    '<div class="fsel3">'+natSelect()+teamSelect()+'<select id="f-type" aria-label="Kartentyp"><option value="">Kartentyp</option>'+types.map(function(t){return opt(t.abbr,t.name,UI.type);}).join('')+'</select></div>'+
     '<div class="fsel">'+
 
     '<select id="f-sort" aria-label="Sortierung">'+sorts.map(function(o){return opt(o[0],o[1].replace('Sortiert nach ','').replace(' zuerst',''),UI.sort);}).join('')+'</select>'+
