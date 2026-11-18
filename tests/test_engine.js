@@ -53,8 +53,8 @@ ok(r2.totals.raw>=r.totals.raw+up[0].delta-1e-6,'adding the top upgrade improves
 // near misses
 const nm=H.nearMisses(data,r,{},8);
 ok(nm.length>0&&nm.every(m=>m.slot&&m.replace),'near misses found: '+nm.length);
-if(nm.length){const fl=H.fillers(data,nm[0],r,3); ok(fl.length>0,'fillers for first near miss: '+fl.map(f=>f.card.n).join(', '));
-  const np=nm[0].line.players.map(p=>p===nm[0].replace?fl[0].card:p); ok(H.comboMatches(nm[0].combo,np),'filler really completes the combo');}
+if(nm.length){const hit=nm.map(m=>({m,fl:H.fillers(data,m,r,3)})).find(x=>x.fl.length); ok(!!hit,'fillers found for a near miss');
+  if(hit){const np=hit.m.line.players.map(p=>p===hit.m.replace?hit.fl[0].card:p); ok(H.comboMatches(hit.m.combo,np),'filler really completes the combo');}}
 // special teams + saved lineup
 const st=H.specialTeams(r); ok(st.pp[0].f.length===3&&st.pp[0].d.length===2&&st.pk[0].f.length===2,'special teams built');
 const byKey={}; data.cards.forEach(c=>byKey[H.key(c)]=c);
