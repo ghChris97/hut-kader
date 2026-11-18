@@ -256,7 +256,8 @@
               var np = old.players.slice(); np[si] = b;
               lines[li] = evalLine(np, g.combos, ctx.val);
               var t = totals(res, ctx);
-              if (fits(t) && (t.raw > cur.raw + 1e-9 || !fits(cur))) { cur = t; changed = true; break; }
+              var capKeep = !(ctx.captain && cur.captain && cur.captain.active && !(t.captain && t.captain.active));
+              if (capKeep && fits(t) && (t.raw > cur.raw + 1e-9 || !fits(cur))) { cur = t; changed = true; break; }
               lines[li] = old;
             }
           }
@@ -328,7 +329,7 @@
       cands.forEach(function (cap) {
         ctx.captain = cap; ctx.capTeams = captainTeams(cap, data);
         ctx.locks = Object.assign({}, baseLocks); ctx.locks[cap.k + cap.id] = 1;
-        var steps = [0, 0.5, 1.5, 3, 6, 12], found = null;
+        var steps = [0, 0.5, 1.5, 3, 6, 12, 25, 50], found = null;
         for (var i = 0; i < steps.length && !found; i++) {
           ctx.teamBonus = steps[i];
           var r = solve(ctx, capBase);
