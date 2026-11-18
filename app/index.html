@@ -812,10 +812,19 @@ function searchText(c){
   var nat=(c.nat||'').toUpperCase();
   return c._s=[c.n,c.tmn,TEAMN.team[String(c.tm)]||'',c.ctn,TEAMN.ct[String(c.ct)]||'',nat,NAT_DE[nat]||'',c.lgn||''].join(' ').toUpperCase();
 }
+/* Exakt gleiche Karten (gleicher Spieler, Typ, OVR, Gehalt, Werte, X-Factors) nur einmal zeigen */
+var DUPS=null;
+function dupSet(){
+  if(DUPS) return DUPS; DUPS={}; var seen={};
+  D.cards.forEach(function(c){ var sig=[c.k,c.n,c.ctn,c.ovr,c.sal,c.pos,(c.a||[]).join(','),(c.xf||[]).slice().sort().join(',')].join('|');
+    if(seen[sig]) DUPS[key(c)]=1; else seen[sig]=1; });
+  return DUPS;
+}
 function filtered(){
   var q=UI.q.trim().toUpperCase(), min=+UI.min||0, max=+UI.max||0, ns=newSince(), stats=Object.keys(UI.stat), hmin=+UI.hgt||0;
   var sortAttr=/^a\d+$/.test(UI.sort)?+UI.sort.slice(1):-1;
   var out=D.cards.filter(function(c){
+    if(dupSet()[key(c)] && !isOwned(c)) return false;
     if(q && !q.split(/\s+/).every(function(w){return searchText(c).indexOf(w)>=0;})) return false;
     if(UI.pos){
       if(UI.pos==='F'){ if(['LW','C','RW'].indexOf(c.pos)<0) return false; }
@@ -1963,7 +1972,7 @@ function loadData(){
   });
 }
 loadData().then(function(d){
-  D=d; LOGO=null; D.xf=D.xf||{}; D.captains=D.captains||[];
+  D=d; LOGO=null; DUPS=null; D.xf=D.xf||{}; D.captains=D.captains||[];
   VER=String(d.meta.version||((d.meta.img_base||'').match(/NHL(\d+)/)||[])[1]||'');
   var v=VD[VER]||{};
   V={owned:(v.owned||[]).slice(),locks:v.locks||{},bans:v.bans||{},lineups:v.lineups||[],xfOn:v.xfOn||{}};
