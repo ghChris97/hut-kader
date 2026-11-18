@@ -69,6 +69,35 @@
     return { players: players, boosts: b, active: active, ovr: ovr, val: v, sal: sal };
   }
 
+  /* Im Spiel zaehlt jedes Combo nur einmal pro Aufstellung (bei mehreren Reihen waehlt man eine).
+     Gibt fuer jede Reihe die wirksamen Boni zurueck; doppelte Combos zaehlen nur in der ersten Reihe. */
+  function uniqueBoosts(lines, taken) {
+    var seen = taken ? Object.assign({}, taken) : {};
+    return lines.map(function (l) {
+      var b = { overall: 0, ability_points: 0, salary: 0 }, act = [], dup = [];
+      l.active.forEach(function (c) { if (seen[c.key]) dup.push(c); else { seen[c.key] = 1; b[c.type] += c.boost; act.push(c); } });
+      return { boosts: b, active: act, dup: dup };
+    });
+  }
+  /* Combos, die in den anderen Reihen schon wirken */
+  function takenElsewhere(lines, skip) {
+    var eff = uniqueBoosts(lines), t = {};
+    eff.forEach(function (e, i) { if (i !== skip) e.active.forEach(function (c) { t[c.key] = 1; }); });
+    return t;
+  }
+  function stripTaken(l, taken) {
+    if (!taken) return l;
+    var e = uniqueBoosts([l], taken)[0];
+    return Object.assign({}, l, { boosts: e.boosts, active: e.active, dup: e.dup });
+  }
+  function finalizeLines(res) {
+    ['forwards', 'defense'].forEach(function (k) {
+      var eff = uniqueBoosts(res[k]);
+      res[k] = res[k].map(function (l, i) { return Object.assign({}, l, { boosts: eff[i].boosts, active: eff[i].active, dup: eff[i].dup }); });
+    });
+    return res;
+  }
+
   function candidates(pool, slots, strict, combos, val) {
     var out = [];
     var n = slots.length;
@@ -168,10 +197,11 @@
   function totals(res, ctx) {
     var w = ctx.w, t = { ovrSum: 0, valSum: 0, n: 0, boostOvr: 0, ap: 0, salBoost: 0, sal: 0, locked: 0, mixed: 0 };
     res.defense.forEach(function (l) { if (mixedPair(l)) t.mixed++; });
-    res.forwards.concat(res.defense).forEach(function (l) {
-      var k = l.players.length;
-      t.ovrSum += l.ovr + l.boosts.overall * k; t.valSum += l.val + l.boosts.overall * k; t.n += k;
-      t.boostOvr += l.boosts.overall; t.ap += l.boosts.ability_points; t.salBoost += l.boosts.salary; t.sal += l.sal;
+    var eff = uniqueBoosts(res.forwards).concat(uniqueBoosts(res.defense));
+    res.forwards.concat(res.defense).forEach(function (l, li) {
+      var k = l.players.length, bo = eff[li].boosts;
+      t.ovrSum += l.ovr + bo.overall * k; t.valSum += l.val + bo.overall * k; t.n += k;
+      t.boostOvr += bo.overall; t.ap += bo.ability_points; t.salBoost += bo.salary; t.sal += l.sal;
       l.players.forEach(function (p) { if (ctx.locks[key(p)]) t.locked++; });
     });
     res.goalies.forEach(function (p) {
@@ -318,7 +348,9 @@
       });
     }
     var byAvg = function (a, b) { return (b.val + b.boosts.overall * b.players.length) - (a.val + a.boosts.overall * a.players.length); };
+    finalizeLines(best);
     best.forwards.sort(byAvg); best.defense.sort(byAvg);
+    finalizeLines(best);
     best.capBase = capBase;
     best.pools = { f: ctx.fPool.length, d: ctx.dPool.length, g: ctx.goalies.length };
     best.missing = { f: Math.max(0, 4 - best.forwards.length), d: Math.max(0, 3 - best.defense.length), g: Math.max(0, 2 - best.goalies.length) };
@@ -361,7 +393,7 @@
               if (inLineup[c.n] && out0.n !== c.n) continue;
               if (val(c) < val(out0) - 8) continue;
               var np = l.players.slice(); np[si] = c;
-              var nl = evalLine(np, g.combos, val);
+              var nl = stripTaken(evalLine(np, g.combos, val), takenElsewhere(g.lines, li));
               var d = contrib(nl, w) - contrib(l, w);
               if ((nl.sal - nl.boosts.salary) - (l.sal - l.boosts.salary) > room + 1e-9) continue;
               if (d > 1e-9 && (!best || d > best.delta)) {
@@ -404,7 +436,7 @@
             if (ctx.locks[key(o)]) continue;
             if (val(c) < val(o) - tol) continue;
             var np = l.players.slice(); np[si] = c;
-            var nl = evalLine(np, g.combos, val);
+            var nl = stripTaken(evalLine(np, g.combos, val), takenElsewhere(g.lines, li));
             if ((nl.sal - nl.boosts.salary) - (l.sal - l.boosts.salary) > room + 1e-9) continue;
             var gain = { overall: nl.boosts.overall - l.boosts.overall, ability_points: nl.boosts.ability_points - l.boosts.ability_points, salary: nl.boosts.salary - l.boosts.salary };
             var bonus = w.ovr * gain.overall * np.length + w.ap * gain.ability_points + w.sal * gain.salary;
@@ -446,8 +478,9 @@
       { lines: res.defense, combos: combosFor(data, 'defense', opts.coach), label: '. Verteidigungsreihe' }];
     groups.forEach(function (g) {
       g.lines.forEach(function (l, li) {
+        var taken = takenElsewhere(g.lines, li);
         g.combos.forEach(function (c) {
-          if (comboMatches(c, l.players)) return;
+          if (comboMatches(c, l.players) || taken[c.key]) return;
           var n = c.slots.length, perms = PERMS[n];
           for (var i = 0; i < perms.length; i++) {
             var missSlot = -1, misses = 0;
@@ -550,6 +583,7 @@
       var cap = (data.captains || []).filter(function (c) { return c.k + c.id === lines.c; })[0];
       if (cap) { ctx.captain = cap; ctx.capTeams = captainTeams(cap, data); }
     }
+    finalizeLines(res);
     res.totals = totals(res, ctx);
     res.capBase = opts.cap > 0 ? opts.cap : 0;
     res.missing = { f: 0, d: 0, g: 0 };
@@ -604,7 +638,7 @@
     return best;
   }
 
-  root.HUT = { bestPartners: bestPartners, optimize: optimize, comboMatches: comboMatches, evalLine: evalLine, combosFor: combosFor, upgrades: upgrades,
+  root.HUT = { uniqueBoosts: uniqueBoosts, takenElsewhere: takenElsewhere, stripTaken: stripTaken, bestPartners: bestPartners, optimize: optimize, comboMatches: comboMatches, evalLine: evalLine, combosFor: combosFor, upgrades: upgrades,
     nearMisses: nearMisses, fillers: fillers, specialTeams: specialTeams, rating: rating, evaluate: evaluate,
     lineupPlayers: lineupPlayers, key: key, GROUPS: GROUPS, heightCm: heightCm, sizeScore: sizeScore, sidesD: sidesD, mixedPair: mixedPair,
     captainTeams: captainTeams, DIVISIONS: DIVISIONS, bonusUpgrades: bonusUpgrades };
