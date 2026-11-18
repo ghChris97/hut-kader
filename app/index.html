@@ -241,6 +241,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--line2);outline:none}
 .pl .img{position:relative;aspect-ratio:804/1128;border-radius:8px;overflow:hidden;background:var(--surface2);margin-bottom:6px;display:grid;place-items:center}
 .pl .img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .pl .img .ovr{font-size:28px}
+.img{container-type:inline-size}
+.bovr{position:absolute;left:3.5%;top:2%;min-width:27%;padding:1% 2%;background:linear-gradient(180deg,#0f1722,#0b1119);color:#3fd0ff;font:700 22cqw/1 var(--display);letter-spacing:-.02em;text-align:center;border-radius:2px;pointer-events:none;text-shadow:0 0 6px rgba(63,208,255,.45)}
 .pl .boost{position:absolute;right:4px;bottom:4px;background:var(--ovr);color:var(--bg);font:700 11px/1 var(--body);padding:3px 5px;border-radius:5px}
 .pl .n{font:600 13px/1.2 var(--body);overflow-wrap:anywhere}
 .pl .v{font-size:11.5px;color:var(--mute);font-variant-numeric:tabular-nums;margin-top:1px}
@@ -1028,8 +1030,10 @@ function reqIcon(r){
 }
 function reqSlot(sl){return sl.map(reqChip).join('<span class="amp">&</span>');}
 function comboHtml(c){return '<span class="cmbi">'+c.slots.map(function(sl){return sl.map(reqIcon).join('<span class="amp">&</span>');}).join('<span class="plus">+</span>')+'</span>';}
+/* Erhoehte OVR wie im Spiel: blaue Zahl ueber der aufgedruckten */
+function bovr(p,boost){ return boost>0?'<span class="bovr" title="'+p.ovr+' + '+boost+' Bonus">'+(p.ovr+boost)+'</span>':''; }
 function plHtml(p,top,boost){
-  return '<button class="pl" data-card="'+key(p)+'" aria-label="Details zu '+esc(nice(p.n))+'"><div class="img"><div class="ovr">'+p.ovr+'</div>'+img(p)+(boost?'<span class="boost">+'+boost+'</span>':'')+'</div>'+
+  return '<button class="pl" data-card="'+key(p)+'" aria-label="Details zu '+esc(nice(p.n))+'"><div class="img"><div class="ovr">'+p.ovr+'</div>'+img(p)+bovr(p,boost)+'</div>'+
     '<div class="n">'+esc(nice(p.n))+'</div><div class="v">'+esc(top)+' · '+money(p.sal||0)+'</div></button>';
 }
 function lineHtml(title,l,isD){
@@ -1053,7 +1057,7 @@ var CAPSVG='<svg class="capt" viewBox="0 0 40 46" aria-label="Captain"><path d="
 var CAPTEAMS=null;
 function slotHtml(p,pos,boost,capKey){
   if(!p) return '<div class="slot empty"><span class="pos">'+pos+'</span><div class="img"></div></div>';
-  return '<button class="slot" data-card="'+key(p)+'" aria-label="'+esc(nice(p.n))+', '+(p.ovr+(boost||0))+'"><span class="pos">'+pos+'</span><div class="img"><div class="ovr">'+p.ovr+'</div>'+img(p)+'</div>'+(capKey===key(p)?CAPSVG:(CAPTEAMS&&CAPTEAMS[p.tm]?STARSVG:''))+'</button>';
+  return '<button class="slot" data-card="'+key(p)+'" aria-label="'+esc(nice(p.n))+', '+(p.ovr+(boost||0))+'"><span class="pos">'+pos+'</span><div class="img"><div class="ovr">'+p.ovr+'</div>'+img(p)+bovr(p,boost)+'</div>'+(capKey===key(p)?CAPSVG:(CAPTEAMS&&CAPTEAMS[p.tm]?STARSVG:''))+'</button>';
 }
 /* Spieler den Plaetzen zuordnen: jeder moeglichst auf seine eigene Position, Rest auffuellen */
 function arrange(players,order){
