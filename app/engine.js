@@ -324,7 +324,7 @@
       var cands = data.captains.filter(function (c) {
         return ownedKeys[c.k + c.id] && (capOpt === 'auto' || capOpt === c.k + c.id);
       });
-      var baseLocks = ctx.locks;
+      var baseLocks = ctx.locks, capAlt = null;
       cands.forEach(function (cap) {
         ctx.captain = cap; ctx.capTeams = captainTeams(cap, data);
         ctx.locks = Object.assign({}, baseLocks); ctx.locks[cap.k + cap.id] = 1;
@@ -338,7 +338,11 @@
         if (found) {
           // Vergleich ohne den Fixier-Bonus des Captains selbst
           var a = found.totals.raw - LOCK * (baseLocks[cap.k + cap.id] ? 0 : 1);
-          if (!best || best.capFailed || a > best.totals.raw + 1e-9) { best = found; best.totals.rawAdj = a; }
+          var bestHasCap = best && best.totals.captain && best.totals.captain.active;
+          if (!best || best.capFailed || a > best.totals.raw + 1e-9 || (opts.forceCaptain && !bestHasCap)) { best = found; best.totals.rawAdj = a; }
+          else if (!bestHasCap && (!capAlt || a > capAlt.raw)) {
+            capAlt = { raw: a, avg: found.totals.avg, valAvg: found.totals.valSum / found.totals.n, ap: found.totals.ap, cap: cap, players: lineupPlayers(found) };
+          }
         } else if (capOpt !== 'auto' && !best.totals.captain) {
           // gewuenschter Captain erreicht das Ziel nicht: trotzdem den Stand zeigen
           ctx.teamBonus = 0;
@@ -346,6 +350,14 @@
         }
         ctx.captain = null; ctx.capTeams = null; ctx.locks = baseLocks;
       });
+      if (capAlt && !(best.totals.captain && best.totals.captain.active)) {
+        var inB = {}; lineupPlayers(best).forEach(function (p) { inB[key(p)] = 1; });
+        var inA = {}; capAlt.players.forEach(function (p) { inA[key(p)] = 1; });
+        capAlt.add = capAlt.players.filter(function (p) { return !inB[key(p)]; });
+        capAlt.drop = lineupPlayers(best).filter(function (p) { return !inA[key(p)]; });
+        capAlt.dAvg = capAlt.avg - best.totals.avg; capAlt.dVal = capAlt.valAvg - best.totals.valSum / best.totals.n; capAlt.dAp = capAlt.ap - best.totals.ap;
+        delete capAlt.players; best.capAlt = capAlt;
+      }
     }
     var byAvg = function (a, b) { return (b.val + b.boosts.overall * b.players.length) - (a.val + a.boosts.overall * a.players.length); };
     finalizeLines(best);
