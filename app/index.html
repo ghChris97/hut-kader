@@ -1264,7 +1264,9 @@ function captainHtml(t,r){
     why='<br>Möglich wäre es mit '+a.add.map(function(p){return '<b>'+esc(nice(p.n))+'</b> ('+p.ovr+')';}).join(', ')+' statt '+a.drop.map(function(p){return esc(nice(p.n))+' ('+p.ovr+')';}).join(', ')+': Ø OVR '+f(a.dAvg)+(S.useRating?', Wert nach deiner Gewichtung '+f(a.dVal):'')+', AP '+(a.dAp>0?'+':'')+a.dAp+'. Die App hat das als schwächer bewertet. Mit „Captain-Bonus immer aktivieren“ im Setup (Aufstellung) nimmt sie diese Variante.'; }
   else if(c.inLineup){
     var bn=Object.keys(V.bans||{}).map(function(k){return byKey[k];}).filter(Boolean);
-    why='<br>Mit deinem Kader und deinen Einstellungen lässt sich der Bonus nicht erreichen.'+(bn.length?' Gesperrt sind: '+bn.map(function(p){return esc(nice(p.n))+' ('+esc(p.tmn)+')';}).join(', ')+'.':' Es fehlen Spieler aus den Zielteams.')+(S.strict?' Feste Positionen sind an.':'');
+    why='<br>Mit deinem Kader und deinen Einstellungen lässt sich der Bonus nicht erreichen.'+(bn.length?' Gesperrt sind: '+bn.map(function(p){return esc(nice(p.n))+' ('+esc(p.tmn)+')';}).join(', ')+'.':'')+
+      (function(){ var lk=Object.keys(V.locks||{}).map(function(k){return byKey[k];}).filter(Boolean); return lk.length?' Fest gesetzt sind: '+lk.map(function(p){return esc(nice(p.n))+' ('+esc(p.tmn)+')';}).join(', ')+'.':''; })()+
+      (bn.length||Object.keys(V.locks||{}).length?'':' Es fehlen Spieler aus den Zielteams.')+(S.strict?' Feste Positionen sind an.':'');
   }
   return '<p class="note warn">Captain '+esc(card?nice(card.n):'')+': '+c.count+' von '+c.need+' Spielern aus den Zielteams'+(c.inLineup?'':', und die Captain-Karte ist nicht aufgestellt')+'. Der Bonus '+lab+' greift nicht.'+why+'</p>';
 }
