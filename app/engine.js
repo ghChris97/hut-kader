@@ -652,7 +652,8 @@
       return ps[0].hand === leftHand ? ps : [ps[1], ps[0]];
     }
     var order = ['LD', 'RD'], out = [null, null], rest = [];
-    ps.forEach(function (p) { var i = order.indexOf(p.pos); if (i >= 0 && !out[i]) out[i] = p; else rest.push(p); });
+    /* Der Staerkere bekommt seine Kartenposition, der andere weicht aus */
+    ps.slice().sort(function (a, b) { return b.ovr - a.ovr; }).forEach(function (p) { var i = order.indexOf(p.pos); if (i >= 0 && !out[i]) out[i] = p; else rest.push(p); });
     return out.map(function (p) { return p || rest.shift(); });
   }
 

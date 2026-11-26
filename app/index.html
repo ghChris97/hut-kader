@@ -1070,10 +1070,16 @@ function slotHtml(p,pos,boost,capKey){
   return '<button class="slot" data-card="'+key(p)+'" aria-label="'+esc(nice(p.n))+', '+(p.ovr+(boost||0))+'"><span class="pos">'+pos+'</span><div class="img"><div class="ovr">'+p.ovr+'</div>'+img(p)+bovr(p,boost)+'</div>'+(capKey===key(p)?CAPSVG:(CAPTEAMS&&CAPTEAMS[p.tm]?STARSVG:''))+'</button>';
 }
 /* Spieler den Plaetzen zuordnen: jeder moeglichst auf seine eigene Position, Rest auffuellen */
+/* Spieler auf Positionen verteilen: der Staerkere bekommt seine eigene Position,
+   wer ausweichen muss, kommt bevorzugt auf die Seite seiner Schusshand (Linksschuetze links). */
 function arrange(players,order){
   var out=new Array(order.length), rest=[];
-  players.forEach(function(p){ var i=order.indexOf(p.pos); if(i>=0&&!out[i]) out[i]=p; else rest.push(p); });
-  for(var i=0;i<out.length;i++) if(!out[i]) out[i]=rest.shift();
+  players.slice().sort(function(a,b){return b.ovr-a.ovr;}).forEach(function(p){ var i=order.indexOf(p.pos); if(i>=0&&!out[i]) out[i]=p; else rest.push(p); });
+  rest.forEach(function(p){
+    var free=[]; for(var i=0;i<out.length;i++) if(!out[i]) free.push(i);
+    var pref=free.filter(function(i){ return (p.hand==='L'&&i===0)||(p.hand==='R'&&i===out.length-1); })[0];
+    out[pref!=null?pref:free[0]]=p;
+  });
   return out;
 }
 function hasBonus(l){return l&&(l.boosts.overall||l.boosts.salary||l.boosts.ability_points);}
