@@ -112,6 +112,9 @@ p{margin:0 0 10px}
 .pkc2 .mc i{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);color:#fff;font:700 11px/1.5 var(--body);font-style:normal;text-align:center}
 .pkdel{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:0;background:#d6453d;color:#fff;display:grid;place-items:center;padding:0}
 .pkdel svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:3;stroke-linecap:round}
+.gm .slot.chg-new .img{outline:3px solid #3ddc84;outline-offset:1px;box-shadow:0 0 12px rgba(61,220,132,.55)} .gm .slot.chg-mov .img{outline:3px solid #ffc83d;outline-offset:1px}
+.chgt{position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);z-index:3;font:800 9px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;padding:3px 5px;border-radius:3px;background:#3ddc84;color:#07130c} .chg-mov .chgt{background:#ffc83d;color:#1a1300}
+.chgbox{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;margin-bottom:10px;border:1px solid #3ddc84;border-radius:var(--r);background:rgba(61,220,132,.08);font-size:13px} .chgbox .btn{flex:none}
 .nwhd{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:4px 0 10px} .nwhd h2{margin:0}
 .nwnav{display:flex;align-items:center;gap:8px} .nwnav button{width:32px;height:32px;border-radius:50%;border:1px solid var(--line2);background:var(--surface);color:var(--ice);font-size:18px;line-height:1;padding:0}
 .nwdots{display:flex;gap:4px;padding:5px 8px;border:1px solid var(--line2);border-radius:20px;max-width:150px;overflow:hidden} .nwdots i{flex:none;width:7px;height:7px;border-radius:50%;background:var(--line2)} .nwdots i.on{background:var(--ice)}
@@ -680,7 +683,7 @@ function valFn(){return S.useRating?HUT.rating(S.weights):function(p){return p.o
 function opts(){return {prev:SHARED?null:V.prevLineup,coach:S.coach,strict:S.strict,cap:parseFloat(S.cap)||0,w:PRIO[S.prio]||PRIO.bal,val:valFn(),locks:SHARED?{}:V.locks,bans:SHARED?{}:V.bans,captain:S.captain,dHand:S.dHand,forceCaptain:S.forceCap!==false};}
 function result(){
   if(!RES){ RES=HUT.optimize(D,owned(),opts());
-    if(!SHARED){ V.prevLineup={f:RES.forwards.map(function(l){return arrange(l.players,['LW','C','RW']).map(key);}),d:RES.defense.map(function(l){return HUT.sidesD(l.players,S.dHand).map(key);}),g:RES.goalies.map(key)}; try{if(VER) VD[VER]=V; var out={v:VD}; for(var k in S) out[k]=S[k]; localStorage.setItem('hutkader',JSON.stringify(out));}catch(e){} }
+    if(!SHARED){ var oldL=V.prevLineup; V.prevLineup={f:RES.forwards.map(function(l){return arrange(l.players,['LW','C','RW']).map(key);}),d:RES.defense.map(function(l){return HUT.sidesD(l.players,S.dHand).map(key);}),g:RES.goalies.map(key)}; if(oldL&&JSON.stringify(oldL)!==JSON.stringify(V.prevLineup)) V.diffBase=oldL; try{if(VER) VD[VER]=V; var out={v:VD}; for(var k in S) out[k]=S[k]; localStorage.setItem('hutkader',JSON.stringify(out));}catch(e){} }
   }
   return RES;
 }
@@ -1083,10 +1086,13 @@ function bonusMini(b){
 }
 var STARSVG='<svg class="star" viewBox="0 0 40 46" aria-label="zählt für den Captain"><path d="M20 2l16 5v15c0 11-7 18-16 22C11 40 4 33 4 22V7z" fill="#1d1f24" stroke="#cfd6de" stroke-width="3"/><path d="M20 12l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L20 26.9l-5.9 3.2 1.3-6.6-4.9-4.6 6.6-.8z" fill="#f2d675"/></svg>';
 var CAPSVG='<svg class="capt" viewBox="0 0 40 46" aria-label="Captain"><path d="M20 2l16 5v15c0 11-7 18-16 22C11 40 4 33 4 22V7z" fill="#1d1f24" stroke="#e7c35a" stroke-width="3"/><text x="20" y="31" text-anchor="middle" font-family="Barlow Condensed,Arial" font-weight="700" font-size="22" fill="#f2d675">C</text></svg>';
-var CAPTEAMS=null;
-function slotHtml(p,pos,boost,capKey){
+var CAPTEAMS=null, CHG=null;
+/* Aenderungen zur vorherigen Aufstellung: neu in der Aufstellung / anderer Platz */
+function lineupPosMap(L){ var m={}; if(!L) return m; (L.f||[]).forEach(function(l,i){l.forEach(function(k,j){if(k) m[k]='f'+i+':'+j;});}); (L.d||[]).forEach(function(l,i){l.forEach(function(k,j){if(k) m[k]='d'+i+':'+j;});}); (L.g||[]).forEach(function(k,j){if(k) m[k]='g'+j;}); return m; }
+function slotHtml(p,pos,boost,capKey,where){
   if(!p) return '<div class="slot empty"><span class="pos">'+pos+'</span><div class="img"></div></div>';
-  return '<button class="slot" data-card="'+key(p)+'" aria-label="'+esc(nice(p.n))+', '+(p.ovr+(boost||0))+'"><span class="pos">'+pos+'</span><div class="img"><div class="ovr">'+p.ovr+'</div>'+img(p)+bovr(p,boost)+'</div>'+(capKey===key(p)?CAPSVG:(CAPTEAMS&&CAPTEAMS[p.tm]?STARSVG:''))+'</button>';
+  var ch=CHG&&where?(CHG.old[key(p)]==null?'new':CHG.old[key(p)]!==where?'mov':''):'';
+  return '<button class="slot'+(ch?' chg-'+ch:'')+'" data-card="'+key(p)+'" aria-label="'+esc(nice(p.n))+', '+(p.ovr+(boost||0))+'"><span class="pos">'+pos+'</span><div class="img"><div class="ovr">'+p.ovr+'</div>'+img(p)+bovr(p,boost)+'</div>'+(capKey===key(p)?CAPSVG:(CAPTEAMS&&CAPTEAMS[p.tm]?STARSVG:''))+(ch?'<span class="chgt">'+(ch==='new'?'Neu':'Platz')+'</span>':'')+'</button>';
 }
 /* Spieler den Plaetzen zuordnen: jeder moeglichst auf seine eigene Position, Rest auffuellen */
 /* Spieler auf Positionen verteilen: der Staerkere bekommt seine eigene Position,
@@ -1111,26 +1117,37 @@ function overviewHtml(r){
   var FP=['LA','C','RA'], DP=['LV','RV'];
   var cst=r.totals&&r.totals.captain, cap=cst&&cst.inLineup?cst.cap.k+cst.cap.id:'';
   CAPTEAMS=cst?HUT.captainTeams(cst.cap,D):null;
-  var h='<div class="gm" id="gm"><div class="gm-in">';
+  CHG=null; var chgNote='';
+  if(!SHARED&&V.diffBase&&V.prevLineup){
+    var oldM=lineupPosMap(V.diffBase), nowM=lineupPosMap(V.prevLineup), nNew=0, nMov=0;
+    Object.keys(nowM).forEach(function(k){ if(oldM[k]==null) nNew++; else if(oldM[k]!==nowM[k]) nMov++; });
+    var outs=Object.keys(oldM).filter(function(k){return nowM[k]==null&&byKey[k];}).map(function(k){return byKey[k];});
+    if(nNew||nMov||outs.length){
+      CHG={old:oldM};
+      chgNote='<div class="chgbox"><div><b>Geändert seit der letzten Aufstellung:</b> '+[nNew?nNew+' neu':'',nMov?nMov+' auf anderem Platz':''].filter(Boolean).join(', ')+
+        (outs.length?'<br><span class="mute">Raus: '+outs.map(function(c){return esc(nice(c.n))+' ('+c.ovr+')';}).join(', ')+'</span>':'')+'</div><button class="btn ghost sm" id="chg-ok">Gesehen</button></div>';
+    }
+  }
+  var h=chgNote+'<div class="gm" id="gm"><div class="gm-in">';
   for(var i=0;i<4;i++){
     var f=r.forwards[i], fp=f?arrange(f.players,['LW','C','RW']):[];
     h+='<div class="side" style="grid-row:'+(i+1)+';grid-column:1">Angriff '+(i+1)+'</div>';
     h+=bandHtml(f,i+1,'1 / 6');
-    FP.forEach(function(pos,j){ h+='<div style="grid-row:'+(i+1)+';grid-column:'+(j+2)+'">'+slotHtml(fp[j],pos,f&&f.boosts.overall,cap)+'</div>'; });
+    FP.forEach(function(pos,j){ h+='<div style="grid-row:'+(i+1)+';grid-column:'+(j+2)+'">'+slotHtml(fp[j],pos,f&&f.boosts.overall,cap,'f'+i+':'+j)+'</div>'; });
     h+='<div style="grid-row:'+(i+1)+';grid-column:5;align-self:center">'+bonusMini(f&&f.boosts)+'</div>';
     h+='<div class="side" style="grid-row:'+(i+1)+';grid-column:6">'+(i<3?'Verteidigung '+(i+1):'Goalies')+'</div>';
     if(i<3){
       var d=r.defense[i], dp=d?HUT.sidesD(d.players,S.dHand):[];
       h+=bandHtml(d,i+1,'6 / 10');
-      DP.forEach(function(pos,j){ h+='<div style="grid-row:'+(i+1)+';grid-column:'+(j+7)+'">'+slotHtml(dp[j],pos,d&&d.boosts.overall,cap)+'</div>'; });
+      DP.forEach(function(pos,j){ h+='<div style="grid-row:'+(i+1)+';grid-column:'+(j+7)+'">'+slotHtml(dp[j],pos,d&&d.boosts.overall,cap,'d'+i+':'+j)+'</div>'; });
       h+='<div style="grid-row:'+(i+1)+';grid-column:9;align-self:center">'+bonusMini(d&&d.boosts)+'</div>';
     }else{
       var gb=r.gline&&r.gline.boosts;
-      h+='<div style="grid-row:4;grid-column:7">'+slotHtml(r.goalies[0],'STARTER',gb&&gb.overall,cap)+'</div><div style="grid-row:4;grid-column:8">'+slotHtml(r.goalies[1],'ERSATZ',gb&&gb.overall,cap)+'</div>'+
+      h+='<div style="grid-row:4;grid-column:7">'+slotHtml(r.goalies[0],'STARTER',gb&&gb.overall,cap,'g0')+'</div><div style="grid-row:4;grid-column:8">'+slotHtml(r.goalies[1],'ERSATZ',gb&&gb.overall,cap,'g1')+'</div>'+
         '<div style="grid-row:4;grid-column:9;align-self:center">'+bonusMini(gb)+'</div>';
     }
   }
-  var req=reqHtml(r); CAPTEAMS=null;
+  var req=reqHtml(r); CAPTEAMS=null; CHG=null;
   return h+'</div></div>'+
     '<p class="legend">GES = Gesamtwertung, M$ = Cap-Bonus, FP = Fähigkeitspunkte · Stern = zählt für den Captain · Karte antippen für Details</p>'+req;
 }
@@ -2014,6 +2031,7 @@ document.addEventListener('click',function(e){
     case 'imp-ok':
       var n=0; UI.imp.found.forEach(function(f){ if(f.on&&V.owned.indexOf(f.sel)<0){V.owned.push(f.sel); n++;} });
       UI.imp=null; UI.up=null; save(); viewKader(); toast(n+(n===1?' Karte':' Karten')+' übernommen'); break;
+    case 'chg-ok': V.diffBase=null; save(); viewReihen(); break;
     case 'ap-auto': apAuto(result()); UI.dAp=true; save(); viewReihen(); break;
     case 'ap-none': V.xfOn={}; UI.dAp=true; save(); viewReihen(); break;
     case 'sv-save':
@@ -2110,7 +2128,7 @@ loadData().then(function(d){
   D=d; LOGO=null; DUPS=null; D.xf=D.xf||{}; D.captains=D.captains||[];
   VER=String(d.meta.version||((d.meta.img_base||'').match(/NHL(\d+)/)||[])[1]||'');
   var v=VD[VER]||{};
-  V={owned:(v.owned||[]).slice(),locks:v.locks||{},bans:v.bans||{},lineups:v.lineups||[],xfOn:v.xfOn||{}};
+  V={owned:(v.owned||[]).slice(),locks:v.locks||{},bans:v.bans||{},lineups:v.lineups||[],xfOn:v.xfOn||{},prevLineup:v.prevLineup||null,diffBase:v.diffBase||null};
   d.cards.forEach(function(c){byKey[key(c)]=c; (byName[c.n]=byName[c.n]||[]).push(c);});
   d.lists.team.forEach(function(t){teamName[t.id]=t.name;});
   d.lists.card_type.forEach(function(t){typeName[t.abbr]=t.name;});
