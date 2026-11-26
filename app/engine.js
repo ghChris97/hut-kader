@@ -211,8 +211,10 @@
       t.boostOvr += bo.overall; t.ap += bo.ability_points; t.salBoost += bo.salary; t.sal += l.sal;
       l.players.forEach(function (p) { if (ctx.locks[key(p)]) t.locked++; });
     });
-    res.goalies.forEach(function (p) {
-      t.ovrSum += p.ovr; t.valSum += ctx.val(p); t.n += 1; t.sal += p.sal || 0; if (ctx.locks[key(p)]) t.locked++;
+    res.goalies.forEach(function (p, gi) {
+      /* Der Ersatz-Goalie spielt praktisch nie: er zaehlt nicht fuer die Staerke, nur fuers Gehalt (moeglichst wenig) */
+      t.ovrSum += p.ovr; t.n += 1; t.sal += p.sal || 0; if (ctx.locks[key(p)]) t.locked++;
+      if (gi === 0) t.valSum += ctx.val(p); else t.backupSal = (p.sal || 0);
     });
     t.comboAp = t.ap; t.comboSal = t.salBoost;
     if (ctx.captain) {
@@ -224,7 +226,7 @@
       }
     }
     t.avg = t.n ? t.ovrSum / t.n : 0;
-    t.raw = w.ovr * t.valSum + w.ap * t.ap + w.sal * t.salBoost + LOCK * t.locked + (ctx.handBonus || 0) * t.mixed;
+    t.raw = w.ovr * t.valSum + w.ap * t.ap + w.sal * t.salBoost + LOCK * t.locked + (ctx.handBonus || 0) * t.mixed - 0.01 * (t.backupSal || 0);
     return t;
   }
 
@@ -237,6 +239,10 @@
     var g = [], gNames = {};
     var gs = function (p) { return ctx.w.ovr * ctx.val(p) + extra(ctx, p) - lambda * (p.sal || 0); };
     ctx.goalies.slice().sort(function (a, b) { return gs(b) - gs(a) || (b.aovr || 0) - (a.aovr || 0); })
+      .forEach(function (p) { if (g.length < 1 && !used[p.n]) { g.push(p); gNames[p.n] = 1; } });
+    /* Ersatz: der guenstigste, der einen Bonus bringt (Captain-Team) oder sonst einfach der billigste */
+    var bs = function (p) { return extra(ctx, p) - (p.sal || 0) - (ctx.locks[key(p)] ? -LOCK : 0); };
+    ctx.goalies.slice().sort(function (a, b) { return bs(b) - bs(a) || a.ovr - b.ovr; })
       .forEach(function (p) { if (g.length < 2 && !gNames[p.n] && !used[p.n]) { g.push(p); gNames[p.n] = 1; } });
     var res = { forwards: f, defense: d, goalies: g };
     res.totals = totals(res, ctx);
@@ -397,6 +403,7 @@
       var best = null;
       if (c.k === 'g') {
         res.goalies.forEach(function (g, gi) {
+          if (gi > 0) return;
           if (inLineup[c.n] && g.n !== c.n) return;
           var d = w.ovr * (val(c) - val(g));
           if ((c.sal || 0) - (g.sal || 0) > room + 1e-9) return;
