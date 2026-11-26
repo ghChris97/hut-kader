@@ -1760,7 +1760,7 @@ function runImport(files){
   chain.then(function(){
     UI.imp={step:'review',found:matchScan(all),raw:all}; viewKader();
   }).catch(function(e){
-    UI.imp={step:'error',msg:(e&&e.message)||'Das Einlesen ist fehlgeschlagen.'}; viewKader();
+    UI.imp={step:'error',msg:(e&&e.message)||'Das Einlesen ist fehlgeschlagen.',files:files}; viewKader();
   });
 }
 function runPaste(text){
@@ -1770,7 +1770,7 @@ function viewImport(){
   var I=UI.imp, h='<h2>Kader einlesen</h2>';
   if(I.step==='scan'){view.innerHTML=h+'<p>'+esc(I.msg)+'</p><progress aria-label="Fortschritt"></progress><p class="small mute" style="margin-top:10px">Das Bild geht zum Auslesen an Google Gemini. Das dauert meist 10 bis 40 Sekunden, wenn Gemini ausgelastet ist auch länger.</p><p><button class="btn ghost" id="imp-cancel">Abbrechen</button></p>';return;}
   if(I.step==='paste'){view.innerHTML=h+'<p class="small mute">Öffne den Screenshot in Google Lens, tippe auf „Text auswählen" und dann auf „Kopieren". Füge den Text hier ein:</p><textarea id="imp-text" rows="8" style="width:100%;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px;color:var(--ice)" aria-label="Kopierter Text"></textarea><div class="btns" style="margin-top:10px"><button class="btn" id="imp-paste-go">Namen suchen</button><button class="btn ghost" id="imp-x">Abbrechen</button></div>';return;}
-  if(I.step==='error'){view.innerHTML=h+'<p class="note warn">'+esc(I.msg)+'</p><div class="btns"><button class="btn ghost" id="imp-paste">Stattdessen Text einfügen</button><button class="btn ghost" id="imp-x">Zurück zum Kader</button></div>';return;}
+  if(I.step==='error'){view.innerHTML=h+'<p class="note warn">'+esc(I.msg)+'</p><div class="btns">'+(I.files&&I.files.length?'<button class="btn" id="imp-retry">Nochmal versuchen</button>':'')+'<button class="btn ghost" id="imp-paste">Stattdessen Text einfügen</button><button class="btn ghost" id="imp-x">Zurück zum Kader</button></div>';return;}
   var ok=I.found.filter(function(f){return f.cards.length;}), bad=I.found.filter(function(f){return !f.cards.length;});
   if(!ok.length){view.innerHTML=h+'<p class="note warn">Auf dem Bild wurde keine Karte erkannt, die es in den Daten gibt. Am besten klappt ein Screenshot oder ein gerades Foto der ganzen Aufstellung.</p><div class="btns"><button class="btn ghost" id="imp-x">Zurück zum Kader</button></div>';return;}
   var n=ok.filter(function(f){return f.on;}).length;
@@ -1880,6 +1880,7 @@ document.addEventListener('click',function(e){
     case 'imp-cam': document.getElementById('file-cam').click(); break;
     case 'imp-x': UI.imp=null; viewKader(); break;
     case 'imp-paste': UI.imp={step:'paste'}; viewKader(); break;
+    case 'imp-retry': runImport(UI.imp.files); break;
     case 'imp-cancel': if(UI.imp) UI.imp.cancel=true; if(SCAN_CTRL) SCAN_CTRL.abort(); break;
     case 'imp-paste-go': runPaste(document.getElementById('imp-text').value); break;
     case 'imp-ok':

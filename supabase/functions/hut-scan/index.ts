@@ -3,7 +3,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 // Erstes verfuegbares Modell gewinnt; ein abgeschaltetes Modell wird uebersprungen.
-const MODELS = (Deno.env.get("GEMINI_MODEL") ?? "gemini-3.5-flash-lite,gemini-3.5-flash,gemini-3.8-flash")
+const MODELS = (Deno.env.get("GEMINI_MODEL") ?? "gemini-3.5-flash-lite,gemini-3.5-flash,gemini-flash-lite-latest,gemini-flash-latest,gemini-3.8-flash")
   .split(",").map((m) => m.trim()).filter(Boolean);
 const ALLOWED = ["https://ghchris97.github.io", "http://localhost:8765", "http://127.0.0.1:8765"];
 const MAX_BYTES = 6_000_000;
@@ -65,7 +65,14 @@ Deno.serve(async (req) => {
   let res: Response | null = null, out: any = null, model = "";
   const tried: string[] = [];
   const started = Date.now();
-  for (const m of MODELS) {
+  // Zwei Durchgaenge: sind alle Modelle gerade ueberlastet, kurz warten und noch einmal versuchen
+  const queue = [...MODELS, "__wait__", ...MODELS];
+  for (const m of queue) {
+    if (m === "__wait__") {
+      if (res && res.ok) break;
+      await new Promise((r) => setTimeout(r, 4_000));
+      continue;
+    }
     const left = TOTAL_MS - (Date.now() - started);
     if (left < 8_000) break;
     model = m;
@@ -100,7 +107,10 @@ Deno.serve(async (req) => {
     if (!res) return json({ error: "Gemini hat zu lange gebraucht. Versuch es in ein paar Minuten noch einmal." }, 504, h);
     const msg = out?.error?.message ?? `HTTP ${res?.status}`;
     const busy = res?.status === 429;
-    return json({ error: busy ? "Das kostenlose Gemini-Kontingent ist gerade ausgeschöpft. Versuch es später noch einmal." : "Gemini-Fehler: " + msg }, busy ? 429 : 502, h);
+    const overloaded = /high demand|overloaded|unavailable/i.test(String(msg)) || res?.status === 503 || tried.some((t) => /:503$/.test(t));
+    return json({ error: busy ? "Das kostenlose Gemini-Kontingent ist gerade ausgeschöpft. Versuch es später noch einmal."
+      : overloaded ? "Gemini ist gerade überlastet (bei Google, nicht bei dir). Versuch es in ein paar Minuten noch einmal."
+      : "Gemini-Fehler: " + msg, retry: busy || overloaded }, busy ? 429 : 502, h);
   }
   const text = out?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
   try {
