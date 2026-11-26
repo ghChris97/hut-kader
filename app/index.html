@@ -112,6 +112,7 @@ p{margin:0 0 10px}
 .pkc2 .mc i{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);color:#fff;font:700 11px/1.5 var(--body);font-style:normal;text-align:center}
 .pkdel{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:0;background:#d6453d;color:#fff;display:grid;place-items:center;padding:0}
 .pkdel svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:3;stroke-linecap:round}
+.pkfz{margin-top:14px;padding:12px 14px} .pkfz h4{margin:0 0 6px} .pkfz p{margin:0 0 6px}
 .pkadd{width:58px;aspect-ratio:804/1128;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:2px dashed var(--line2);background:rgba(255,255,255,.03);color:var(--mute);font:700 11px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
 .pkadd span{font-size:24px;line-height:1;color:var(--ice)} .pkadd svg{width:22px;height:22px;stroke:var(--ice);fill:none;stroke-width:1.8}
 .pkr{display:grid;grid-template-columns:58px 1fr;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
@@ -1449,10 +1450,54 @@ function pkRank(){
     var r2=HUT.optimize(D,owned().concat([c]),opts()), at=findSlot(r2,k), t1=base.totals, t2=r2.totals;
     var inA={}, inB={}; HUT.lineupPlayers(base).forEach(function(p){inA[key(p)]=p;}); HUT.lineupPlayers(r2).forEach(function(p){inB[key(p)]=p;});
     var outP=Object.keys(inA).filter(function(x){return !inB[x];}).map(function(x){return inA[x];});
-    out.push({c:c,at:at,out:outP,d:t2.raw-t1.raw,avg:t2.avg-t1.avg,ap:t2.ap-t1.ap,bo:t2.boostOvr-t1.boostOvr,mx:(t2.mixed||0)-(t1.mixed||0),capLost:!!(t1.captain&&t1.captain.active&&!(t2.captain&&t2.captain.active))});
+    var pts=function(r){return r.totals.ovrSum-(r.goalies[1]?r.goalies[1].ovr:0);};
+    out.push({c:c,at:at,out:outP,pts:pts(r2)-pts(base),vd:t2.valSum-t1.valSum,sb:t2.salBoost-t1.salBoost,d:t2.raw-t1.raw,avg:t2.avg-t1.avg,ap:t2.ap-t1.ap,bo:t2.boostOvr-t1.boostOvr,mx:(t2.mixed||0)-(t1.mixed||0),capLost:!!(t1.captain&&t1.captain.active&&!(t2.captain&&t2.captain.active))});
   });
   out.sort(function(a,b){return (a.own?1:0)-(b.own?1:0)||b.d-a.d;});
   return out;
+}
+/* Gesamtfazit: warum die Empfehlung vor den anderen liegt */
+function pkFazit(res){
+  var ev=res.filter(function(x){return !x.own&&x.at;}), best=ev[0];
+  var nm=function(x){return '<b>'+esc(nice(x.c.n))+'</b>';};
+  var n1=function(v){return (v>0?'+':'')+String(Math.round(v*10)/10).replace('.',',');};
+  if(!best||best.d<=0) return '<div class="card pkfz"><h4>Fazit</h4><p class="small">Keine der Karten macht deine Aufstellung besser'+(ev.length?' – alle würden höchstens gleich stark oder schwächer machen.':'.')+' Lass das Pack lieber liegen oder nimm die Karte mit dem besten Wiederverkaufswert.</p></div>';
+  var why=function(x){
+    var r=[];
+    if(Math.abs(x.pts)>0.01) r.push(n1(x.pts)+' OVR-Punkte in der Aufstellung'+(x.bo?' (davon '+n1(x.bo)+' durch Boni)':''));
+    if(x.mx>0) r.push('ein Verteidigerpaar mit Links-/Rechtsschütze');
+    if(x.mx<0) r.push('verliert ein Links-/Rechts-Verteidigerpaar');
+    if(x.ap) r.push(n1(x.ap)+' AP');
+    if(x.sb) r.push(n1(x.sb)+' Cap-Bonus');
+    if(S.useRating&&Math.abs(x.vd-x.pts)>=0.5) r.push((x.vd>x.pts?'besser':'schlechter')+' in deiner eigenen Bewertung (Größe/Attribute)');
+    if(x.capLost) r.push('Captain-Bonus fällt weg');
+    return r;
+  };
+  var join=function(a){return a.length<2?a.join(''):a.slice(0,-1).join(', ')+' und '+a[a.length-1];};
+  var h='<p>'+nm(best)+' bringt '+(join(why(best))||'einen kleinen Vorteil')+'.</p>';
+  ev.slice(1,6).forEach(function(x){
+    var t;
+    if(x.d<=0) t='macht die Aufstellung nicht besser'+(x.at&&x.at.t==='g'&&x.at.i?' – als Backup-Goalie zählen nur Boni und Gehalt':'')+'.';
+    else {
+      var adv=[];
+      if(x.pts>best.pts+0.01) adv.push('mehr OVR ('+n1(x.pts)+' statt '+n1(best.pts)+')');
+      if(x.ap>best.ap) adv.push('mehr AP');
+      var lack=[];
+      if(best.mx>x.mx) lack.push('kein gemischtes Verteidigerpaar');
+      if(best.pts>x.pts+0.01) lack.push('weniger OVR ('+n1(x.pts)+' statt '+n1(best.pts)+')');
+      if(best.ap>x.ap) lack.push('weniger AP');
+      if(best.sb>x.sb) lack.push('weniger Cap-Bonus');
+      if(S.useRating&&best.vd-best.pts>x.vd-x.pts+0.5) lack.push('schlechter in deiner Bewertung');
+      if(x.capLost&&!best.capLost) lack.push('Captain-Bonus fällt weg');
+      if(x.at&&x.at.t==='g'&&x.at.i) lack.push('nur Backup-Goalie');
+      t=(adv.length?'bringt zwar '+join(adv)+', aber ':'')+(lack.length?join(lack):'insgesamt knapp weniger')+'.';
+      if(best.d-x.d<0.3) t+=' Sehr knapp – fast gleichwertig.';
+    }
+    h+='<p>'+nm(x)+' '+t+'</p>';
+  });
+  var nope=res.filter(function(x){return !x.own&&!x.at;});
+  if(nope.length) h+='<p>'+nope.map(nm).join(', ')+' '+(nope.length>1?'würden':'würde')+' gar nicht spielen.</p>';
+  return '<div class="card pkfz"><h4>Fazit: '+esc(nice(best.c.n))+'</h4><div class="small">'+h+'</div></div>';
 }
 function pkHtml(){
   if(!owned().length) return '<p class="small mute">Lege zuerst deinen Kader an.</p>';
@@ -1468,7 +1513,7 @@ function pkHtml(){
       var dd=function(v,dig){var s=(v>0?'+':'')+(dig?v.toFixed(dig):Math.round(v)); return '<b class="'+(v>0.0001?'up':v<-0.0001?'dn':'')+'">'+s.replace('.',',')+'</b>';};
       return '<div class="pkr'+(best?' best':'')+'"><button class="mc" data-card="'+k+'">'+img(c)+'</button><div class="pkrt"><div class="pkrn">'+(best?'<span class="recl">Empfehlung</span> ':'')+'<b>'+esc(nice(c.n))+'</b> <span class="mute">'+c.ovr+' · '+esc(c.pos)+'</span></div>'+
         '<div class="small">'+where+'</div>'+(x.own||!x.at?'':'<div class="pkrs">Ø OVR '+dd(x.avg,1)+' · AP '+dd(x.ap)+' · OVR-Boni '+dd(x.bo)+(x.mx>0?'<br><span class="up">+ Verteidigerpaar mit Links-/Rechtsschütze (One-Timer)</span>':x.mx<0?'<br><span class="dn">− Verteidigerpaar verliert Links-/Rechts-Mischung</span>':'')+(x.at&&x.at.t==='g'&&x.at.i?'<br><span class="mute">Backup-Goalie spielt kaum: zählt nur für Boni und Gehalt</span>':'')+(x.capLost?'<br><span class="dn">Captain-Bonus fällt weg</span>':'')+'</div>')+'</div></div>';
-    }).join('')+'<p class="small mute">Bewertet wird wie beim Optimierer (Priorität aus dem Setup): Stärke der Aufstellung, AP, Cap-Bonus und – wenn im Setup eingestellt – Schusshand der Verteidigerpaare. Tippe auf eine Karte für Details und „In meinen Reihen testen“.</p>';
+    }).join('')+pkFazit(st.res)+'<p class="small mute">Bewertet wird wie beim Optimierer (Priorität aus dem Setup): Stärke der Aufstellung, AP, Cap-Bonus und – wenn im Setup eingestellt – Schusshand der Verteidigerpaare. Tippe auf eine Karte für Details und „In meinen Reihen testen“.</p>';
   }
   return h;
 }
