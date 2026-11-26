@@ -186,6 +186,13 @@
       if (g.kind === 'division' && DIVISIONS[g.key]) DIVISIONS[g.key].forEach(function (t) { set[t] = 1; });
       if (g.kind === 'league' && data) data.cards.forEach(function (c) { if (c.lgn === g.key) set[c.tm] = 1; });
     });
+    /* Alumni-Teams zaehlen im Spiel wie ihr NHL-Team (z. B. Buffalo Sabres Alumni = BUF) */
+    var teams = data && data.lists && data.lists.team;
+    if (teams) {
+      var abbrs = {};
+      teams.forEach(function (t) { if (set[t.id] && t.abbr && /^NHL/.test(t.group || 'NHL')) abbrs[t.abbr] = 1; });
+      teams.forEach(function (t) { if (abbrs[t.abbr] && /^NHL/.test(t.group || '')) set[t.id] = 1; });
+    }
     return set;
   }
   function captainState(res, cap, teams) {

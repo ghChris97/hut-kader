@@ -1124,15 +1124,16 @@ function reqHtml(r){
   var h='', cst=r.totals&&r.totals.captain;
   if(cst){
     var cc=byKey[cst.cap.k+cst.cap.id], teams=HUT.captainTeams(cst.cap,D), inL={};
-    HUT.lineupPlayers(r).forEach(function(p){ if(teams[p.tm]) inL[p.tm]=(inL[p.tm]||0)+1; });
+    var abOf=function(t){return (D.lists.team.filter(function(x){return String(x.id)===String(t);})[0]||{}).abbr||teamName[t];};
+    HUT.lineupPlayers(r).forEach(function(p){ if(teams[p.tm]){ var ab0=abOf(p.tm); inL[ab0]=(inL[ab0]||0)+1; } });
+    var abTeams={}; (cst.cap.teams||[]).forEach(function(t){ abTeams[abOf(t)]=t; }); Object.keys(teams).forEach(function(t){ var a1=abOf(t); if(a1&&!abTeams[a1]) abTeams[a1]=t; });
     var dn=divName(cst.cap.teams), lab=cst.type==='ability_points'?'+'+cst.boost+' FP':cst.type==='salary'?'+'+cst.boost+' M$':'+'+cst.boost;
     var cps=HUT.lineupPlayers(r).filter(function(p){return teams[p.tm];});
     h+='<div class="req"><div class="ic face">'+(cc?img(cc):'')+'</div><div><b>Captain '+esc(cc?nice(cc.n):'')+'</b> <span class="pill a">'+lab+'</span>'+
       '<p>'+cst.need+'× '+(dn||'Zielteams')+'</p>'+
-      '<div class="need">'+Object.keys(teams).filter(function(t){return teamName[t];}).sort(function(a,b){return (inL[b]||0)-(inL[a]||0);}).map(function(t){
-        var ab=(D.lists.team.filter(function(x){return String(x.id)===String(t);})[0]||{}).abbr||teamName[t];
-        var lg=logoOf('team',t);
-        return '<span class="k'+(inL[t]?' hit':'')+'">'+(lg?'<img src="'+esc(D.meta.img_base+lg)+'" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">':'')+esc(ab)+(inL[t]?' ×'+inL[t]:'')+'</span>';}).join('')+'</div></div>'+
+      '<div class="need">'+Object.keys(abTeams).sort(function(a,b){return (inL[b]||0)-(inL[a]||0);}).map(function(ab){
+        var lg=logoOf('team',abTeams[ab]);
+        return '<span class="k'+(inL[ab]?' hit':'')+'">'+(lg?'<img src="'+esc(D.meta.img_base+lg)+'" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">':'')+esc(ab)+(inL[ab]?' ×'+inL[ab]:'')+'</span>';}).join('')+'</div></div>'+
       '<span class="st '+(cst.active?'ok':'no')+'">'+cst.count+' / '+cst.need+'</span></div>';
   }
   if(S.coach){
