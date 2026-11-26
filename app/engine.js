@@ -571,12 +571,12 @@
     weights = weights || {};
     var wOf = function (k, d) { return weights[k] == null || weights[k] === '' ? d : +weights[k] || 0; };
     var keys = Object.keys(GROUPS), wO = wOf('ovr', 1), wS = wOf('size', 0) * 0.5, wG = wOf('gsize', 0) * 0.35, sum = wO + wS;
-    keys.forEach(function (k) { sum += wOf(k, 1); });
+    keys.forEach(function (k) { sum += wOf(k, 0); });
     return function (p) {
       if (p.k !== 's') { var gs = wO + wG; if (!wG || !gs) return p.ovr; return Math.round((wO * p.ovr + wG * sizeScore(p)) / gs * 10) / 10; }
       if (!sum) return p.ovr;
       var v = wO * p.ovr + wS * sizeScore(p);
-      keys.forEach(function (k) { var w = wOf(k, 1); if (w) v += w * avg(p, GROUPS[k]); });
+      keys.forEach(function (k) { var w = wOf(k, 0); if (w) v += w * avg(p, GROUPS[k]); });
       return Math.round(v / sum * 10) / 10;
     };
   }

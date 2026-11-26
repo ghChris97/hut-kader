@@ -31,7 +31,7 @@ const star=all.filter(p=>p.k==='s').sort((a,b)=>b.ovr-a.ovr)[0];
 const rb=H.optimize(data,owned,{strict:true,w:W,bans:{[H.key(star)]:1}});
 ok(!H.lineupPlayers(rb).includes(star),'banned player is not in the lineup');
 // custom rating
-const speed=H.rating({skating:1}); const rs=H.optimize(data,owned,{strict:true,w:W,val:speed});
+const speed=H.rating({skating:1,ovr:0}); const rs=H.optimize(data,owned,{strict:true,w:W,val:speed});
 const avgSkate=(res)=>{const ps=H.lineupPlayers(res).filter(p=>p.k==='s'); return ps.reduce((s,p)=>s+speed(p),0)/ps.length;};
 ok(avgSkate(rs)>=avgSkate(r)-1e-9,'skating rating yields faster lineup ('+avgSkate(rs).toFixed(2)+' vs '+avgSkate(r).toFixed(2)+')');
 // captain: build a roster around a captain card
