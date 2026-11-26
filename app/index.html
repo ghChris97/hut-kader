@@ -663,8 +663,13 @@ var IC={
 function owned(){return (SHARED||V.owned).map(function(k){return byKey[k];}).filter(Boolean);}
 function isOwned(c){return (SHARED||V.owned).indexOf(key(c))>=0;}
 function valFn(){return S.useRating?HUT.rating(S.weights):function(p){return p.ovr;};}
-function opts(){return {coach:S.coach,strict:S.strict,cap:parseFloat(S.cap)||0,w:PRIO[S.prio]||PRIO.bal,val:valFn(),locks:SHARED?{}:V.locks,bans:SHARED?{}:V.bans,captain:S.captain,dHand:S.dHand,forceCaptain:S.forceCap!==false};}
-function result(){ if(!RES) RES=HUT.optimize(D,owned(),opts()); return RES; }
+function opts(){return {prev:SHARED?null:V.prevLineup,coach:S.coach,strict:S.strict,cap:parseFloat(S.cap)||0,w:PRIO[S.prio]||PRIO.bal,val:valFn(),locks:SHARED?{}:V.locks,bans:SHARED?{}:V.bans,captain:S.captain,dHand:S.dHand,forceCaptain:S.forceCap!==false};}
+function result(){
+  if(!RES){ RES=HUT.optimize(D,owned(),opts());
+    if(!SHARED){ V.prevLineup={f:RES.forwards.map(function(l){return arrange(l.players,['LW','C','RW']).map(key);}),d:RES.defense.map(function(l){return HUT.sidesD(l.players,S.dHand).map(key);}),g:RES.goalies.map(key)}; try{if(VER) VD[VER]=V; var out={v:VD}; for(var k in S) out[k]=S[k]; localStorage.setItem('hutkader',JSON.stringify(out));}catch(e){} }
+  }
+  return RES;
+}
 function newSince(){
   if(S.prevSeen) return S.prevSeen;
   var d=new Date(D.meta.updated); d.setDate(d.getDate()-7); return d.toISOString().slice(0,10);

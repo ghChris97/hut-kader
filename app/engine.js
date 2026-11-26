@@ -229,7 +229,7 @@
       }
     }
     t.avg = t.n ? t.ovrSum / t.n : 0;
-    t.raw = w.ovr * t.valSum + w.ap * t.ap + w.sal * t.salBoost + LOCK * t.locked + (ctx.handBonus || 0) * t.mixed - 0.01 * (t.backupSal || 0);
+    t.raw = w.ovr * t.valSum + w.ap * t.ap + w.sal * t.salBoost + LOCK * t.locked + (ctx.handBonus || 0) * t.mixed - 0.01 * (t.backupSal || 0) + stickiness(res, ctx);
     return t;
   }
 
@@ -257,6 +257,30 @@
     });
     res.goalies = best || [];
     return res;
+  }
+
+  /* Letzte Aufstellung merken: bei fast gleich starken Varianten gewinnt die, die ihr am naechsten ist */
+  var STICK_P = 0.01, STICK_PAIR = 0.01; /* winzig: max ~0.4 gesamt < 1 OVR-Punkt */
+  function prevIndex(prev) {
+    if (!prev) return null;
+    var inL = {}, pair = {}, pos = {};
+    ['f', 'd'].forEach(function (g) { (prev[g] || []).forEach(function (line, li) {
+      line.forEach(function (k, si) { inL[k] = 1; pos[k] = g + li + ':' + si; });
+      for (var i = 0; i < line.length; i++) for (var j = i + 1; j < line.length; j++) pair[[line[i], line[j]].sort().join('|')] = 1;
+    }); });
+    (prev.g || []).forEach(function (k, i) { inL[k] = 1; pos[k] = 'g' + i; });
+    return { inL: inL, pair: pair, pos: pos };
+  }
+  function stickiness(res, ctx) {
+    var pv = ctx.prev; if (!pv) return 0;
+    var s = 0;
+    res.forwards.concat(res.defense).forEach(function (l) {
+      var ks = l.players.map(key);
+      ks.forEach(function (k) { if (pv.inL[k]) s += STICK_P; });
+      for (var i = 0; i < ks.length; i++) for (var j = i + 1; j < ks.length; j++) if (pv.pair[[ks[i], ks[j]].sort().join('|')]) s += STICK_PAIR;
+    });
+    res.goalies.forEach(function (p) { if (pv.inL[key(p)]) s += STICK_P; });
+    return s;
   }
 
   function build(ctx, lambda) {
@@ -343,7 +367,7 @@
     var fC = usable(combosFor(data, 'forwards', opts.coach), fPool);
     var dC = usable(combosFor(data, 'defense', opts.coach), dPool);
     return {
-      w: opts.w || { ovr: 1, ap: 0.5, sal: 0.25 }, val: val, locks: locks, strict: strict,
+      w: opts.w || { ovr: 1, ap: 0.5, sal: 0.25 }, val: val, locks: locks, strict: strict, prev: prevIndex(opts.prev),
       dHand: opts.dHand || '', handBonus: opts.dHand ? (opts.handBonus != null ? opts.handBonus : 4) : 0,
       fPool: fPool, dPool: dPool, fC: fC, dC: dC, gC: usable(combosFor(data, 'defense', opts.coach), goalies), goalies: goalies,
       fCands: candidates(fPool, F_POS, strict, fC, val), dCands: candidates(dPool, D_POS, strict && !opts.dHand, dC, val),
@@ -400,7 +424,17 @@
         delete capAlt.players; best.capAlt = capAlt;
       }
     }
-    var byAvg = function (a, b) { return (b.val + b.boosts.overall * b.players.length) - (a.val + a.boosts.overall * a.players.length); };
+    var prevNo = function (l) {
+      if (!ctx.prev) return 99; var c = {};
+      l.players.forEach(function (p) { var ps = ctx.prev.pos[key(p)]; if (ps) { var n = ps.split(':')[0]; c[n] = (c[n] || 0) + 1; } });
+      var bestN = null; Object.keys(c).forEach(function (n) { if (bestN === null || c[n] > c[bestN]) bestN = n; });
+      return bestN && c[bestN] >= 2 ? +bestN.slice(1) : 99;
+    };
+    var byAvg = function (a, b) {
+      var d = (b.val + b.boosts.overall * b.players.length) - (a.val + a.boosts.overall * a.players.length);
+      if (Math.abs(d) < 0.5) { var pa = prevNo(a), pb = prevNo(b); if (pa !== pb) return pa - pb; }
+      return d;
+    };
     finalizeLines(best);
     best.forwards.sort(byAvg); best.defense.sort(byAvg);
     finalizeLines(best);
