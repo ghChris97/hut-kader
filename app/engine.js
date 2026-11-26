@@ -237,8 +237,8 @@
      Ein Combo, das schon ein Verteidigerpaar nutzt, zaehlt bei den Goalies nicht noch einmal. */
   function takenByD(res) { var t = {}; uniqueBoosts(res.defense).forEach(function (e) { e.active.forEach(function (c) { t[c.key] = 1; }); }); return t; }
   function goalieLine(res, ctx) {
-    if (!res.goalies || res.goalies.length < 2 || !ctx.dC) return null;
-    return stripTaken(evalLine(res.goalies.slice(0, 2), ctx.dC, ctx.val), takenByD(res));
+    if (!res.goalies || res.goalies.length < 2 || !(ctx.gC || ctx.dC)) return null;
+    return stripTaken(evalLine(res.goalies.slice(0, 2), ctx.gC || ctx.dC, ctx.val), takenByD(res));
   }
   function chooseGoalies(res, ctx, lambda, used) {
     var w = ctx.w, taken = takenByD(res), gs = ctx.goalies.filter(function (p) { return !used[p.n]; });
@@ -246,7 +246,7 @@
     var sc = function (s, b) {
       var v = w.ovr * ctx.val(s) + extra(ctx, s) - lambda * (s.sal || 0);
       if (!b) return { v: v, l: null };
-      var l = stripTaken(evalLine([s, b], ctx.dC, ctx.val), taken);
+      var l = stripTaken(evalLine([s, b], ctx.gC || ctx.dC, ctx.val), taken);
       v += w.ovr * l.boosts.overall + w.ap * l.boosts.ability_points + w.sal * l.boosts.salary + extra(ctx, b) - lambda * (b.sal || 0) - 0.01 * (b.sal || 0);
       return { v: v, l: l };
     };
@@ -345,7 +345,7 @@
     return {
       w: opts.w || { ovr: 1, ap: 0.5, sal: 0.25 }, val: val, locks: locks, strict: strict,
       dHand: opts.dHand || '', handBonus: opts.dHand ? (opts.handBonus != null ? opts.handBonus : 4) : 0,
-      fPool: fPool, dPool: dPool, fC: fC, dC: dC, goalies: goalies,
+      fPool: fPool, dPool: dPool, fC: fC, dC: dC, gC: usable(combosFor(data, 'defense', opts.coach), goalies), goalies: goalies,
       fCands: candidates(fPool, F_POS, strict, fC, val), dCands: candidates(dPool, D_POS, strict && !opts.dHand, dC, val),
       captain: null, capTeams: null, teamBonus: 0, owned: owned
     };
