@@ -216,6 +216,9 @@
       t.ovrSum += p.ovr; t.n += 1; t.sal += p.sal || 0; if (ctx.locks[key(p)]) t.locked++;
       if (gi === 0) t.valSum += ctx.val(p); else t.backupSal = (p.sal || 0);
     });
+    var gl = goalieLine(res, ctx);
+    res.gline = gl;
+    if (gl) { var gb = gl.boosts; t.boostOvr += gb.overall; t.ap += gb.ability_points; t.salBoost += gb.salary; t.ovrSum += gb.overall * 2; t.valSum += gb.overall; }
     t.comboAp = t.ap; t.comboSal = t.salBoost;
     if (ctx.captain) {
       var st = captainState(res, ctx.captain, ctx.capTeams);
@@ -230,21 +233,40 @@
     return t;
   }
 
+  /* Goalies (Starter + Ersatz) koennen im Spiel dieselben Combos wie ein Verteidigerpaar ausloesen.
+     Ein Combo, das schon ein Verteidigerpaar nutzt, zaehlt bei den Goalies nicht noch einmal. */
+  function takenByD(res) { var t = {}; uniqueBoosts(res.defense).forEach(function (e) { e.active.forEach(function (c) { t[c.key] = 1; }); }); return t; }
+  function goalieLine(res, ctx) {
+    if (!res.goalies || res.goalies.length < 2 || !ctx.dC) return null;
+    return stripTaken(evalLine(res.goalies.slice(0, 2), ctx.dC, ctx.val), takenByD(res));
+  }
+  function chooseGoalies(res, ctx, lambda, used) {
+    var w = ctx.w, taken = takenByD(res), gs = ctx.goalies.filter(function (p) { return !used[p.n]; });
+    var best = null, bestS = -Infinity;
+    var sc = function (s, b) {
+      var v = w.ovr * ctx.val(s) + extra(ctx, s) - lambda * (s.sal || 0);
+      if (!b) return { v: v, l: null };
+      var l = stripTaken(evalLine([s, b], ctx.dC, ctx.val), taken);
+      v += w.ovr * l.boosts.overall + w.ap * l.boosts.ability_points + w.sal * l.boosts.salary + extra(ctx, b) - lambda * (b.sal || 0) - 0.01 * (b.sal || 0);
+      return { v: v, l: l };
+    };
+    gs.forEach(function (s) {
+      var any = false;
+      gs.forEach(function (b) { if (b.n === s.n) return; any = true; var r = sc(s, b); if (r.v > bestS + 1e-9) { bestS = r.v; best = [s, b]; } });
+      if (!any) { var r1 = sc(s, null); if (r1.v > bestS) { bestS = r1.v; best = [s]; } }
+    });
+    res.goalies = best || [];
+    return res;
+  }
+
   function build(ctx, lambda) {
     var f = pickMost(ctx.fCands, 4, ctx, lambda, {});
     var used = {};
     f.forEach(function (l) { l.players.forEach(function (p) { used[p.n] = 1; }); });
     var d = pickMost(ctx.dCands, 3, ctx, lambda, used);
     d.forEach(function (l) { l.players.forEach(function (p) { used[p.n] = 1; }); });
-    var g = [], gNames = {};
-    var gs = function (p) { return ctx.w.ovr * ctx.val(p) + extra(ctx, p) - lambda * (p.sal || 0); };
-    ctx.goalies.slice().sort(function (a, b) { return gs(b) - gs(a) || (b.aovr || 0) - (a.aovr || 0); })
-      .forEach(function (p) { if (g.length < 1 && !used[p.n]) { g.push(p); gNames[p.n] = 1; } });
-    /* Ersatz: der guenstigste, der einen Bonus bringt (Captain-Team) oder sonst einfach der billigste */
-    var bs = function (p) { return extra(ctx, p) - (p.sal || 0) - (ctx.locks[key(p)] ? -LOCK : 0); };
-    ctx.goalies.slice().sort(function (a, b) { return bs(b) - bs(a) || a.ovr - b.ovr; })
-      .forEach(function (p) { if (g.length < 2 && !gNames[p.n] && !used[p.n]) { g.push(p); gNames[p.n] = 1; } });
-    var res = { forwards: f, defense: d, goalies: g };
+    var res = { forwards: f, defense: d, goalies: [] };
+    chooseGoalies(res, ctx, lambda, used);
     res.totals = totals(res, ctx);
     return res;
   }
@@ -277,6 +299,11 @@
         }
       }
     }
+    var usedF = {}; res.forwards.concat(res.defense).forEach(function (l) { l.players.forEach(function (p) { usedF[p.n] = 1; }); });
+    var oldG = res.goalies; chooseGoalies(res, ctx, 0, usedF);
+    var tg = totals(res, ctx);
+    var capKeepG = !(ctx.captain && cur.captain && cur.captain.active && !(tg.captain && tg.captain.active));
+    if (capKeepG && fits(tg) && tg.raw >= cur.raw - 1e-9) cur = tg; else { res.goalies = oldG; cur = totals(res, ctx); }
     res.totals = cur;
     return res;
   }
@@ -605,7 +632,7 @@
       defense: (lines.d || []).map(get).filter(function (a) { return a.length === 2; }).map(function (a) { return evalLine(a, dC, val); }),
       goalies: get(lines.g || [])
     };
-    var ctx = { w: opts.w || { ovr: 1, ap: 0.5, sal: 0.25 }, val: val, locks: {}, captain: null };
+    var ctx = { w: opts.w || { ovr: 1, ap: 0.5, sal: 0.25 }, val: val, locks: {}, captain: null, dC: dC };
     if (lines.c) {
       var cap = (data.captains || []).filter(function (c) { return c.k + c.id === lines.c; })[0];
       if (cap) { ctx.captain = cap; ctx.capTeams = captainTeams(cap, data); }

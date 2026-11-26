@@ -1100,7 +1100,9 @@ function overviewHtml(r){
       DP.forEach(function(pos,j){ h+='<div style="grid-row:'+(i+1)+';grid-column:'+(j+7)+'">'+slotHtml(dp[j],pos,d&&d.boosts.overall,cap)+'</div>'; });
       h+='<div style="grid-row:'+(i+1)+';grid-column:9;align-self:center">'+bonusMini(d&&d.boosts)+'</div>';
     }else{
-      h+='<div style="grid-row:4;grid-column:7">'+slotHtml(r.goalies[0],'STARTER',0,cap)+'</div><div style="grid-row:4;grid-column:8">'+slotHtml(r.goalies[1],'ERSATZ',0,cap)+'</div>';
+      var gb=r.gline&&r.gline.boosts;
+      h+='<div style="grid-row:4;grid-column:7">'+slotHtml(r.goalies[0],'STARTER',gb&&gb.overall,cap)+'</div><div style="grid-row:4;grid-column:8">'+slotHtml(r.goalies[1],'ERSATZ',gb&&gb.overall,cap)+'</div>'+
+        '<div style="grid-row:4;grid-column:9;align-self:center">'+bonusMini(gb)+'</div>';
     }
   }
   var req=reqHtml(r); CAPTEAMS=null;
@@ -1307,7 +1309,9 @@ function viewReihen(){
   else{
   if(r.forwards.length){h+='<h2>Sturm</h2><div class="list">'+r.forwards.map(function(l,i){return lineHtml((i+1)+'. Sturmreihe',l);}).join('')+'</div>';}
   if(r.defense.length){h+='<h2>Abwehr</h2><div class="list">'+r.defense.map(function(l,i){return lineHtml((i+1)+'. Verteidigungsreihe',l,true);}).join('')+'</div>';}
-  if(r.goalies.length){h+='<h2>Tor</h2><div class="line"><div class="players">'+r.goalies.map(function(p,i){return plHtml(p,i?'Backup':'Starter');}).join('')+'</div></div>';}
+  if(r.goalies.length){ var gl=r.gline;
+    h+='<h2>Tor</h2><div class="line">'+(gl?'<div class="linehead"><strong>Goalies</strong><div class="pills">'+pillsFor(gl.boosts)+'</div></div>':'')+'<div class="players">'+r.goalies.map(function(p,i){return plHtml(p,i?'Ersatz':'Starter',gl&&gl.boosts.overall);}).join('')+'</div>'+
+      (gl?gl.active.map(function(c){return '<div class="combo">'+(c.src==='Coach'?'Coach: ':'')+comboHtml(c)+' <b>'+boostLabel(c)+'</b></div>';}).join('')+((gl.dup&&gl.dup.length)?'<div class="combo dup">Zählt schon bei einem Verteidigerpaar: '+gl.dup.map(function(c){return comboHtml(c)+' <s>'+boostLabel(c)+'</s>';}).join(' ')+'</div>':''):'')+'</div>';}
   }
   if(r.capFailed) h+='<p class="note warn">Mit diesem Kader bleibt keine vollständige Aufstellung unter dem Cap. Angezeigt wird die stärkste Aufstellung ohne Cap.</p>';
   else if(r.capAdjusted) h+='<p class="note">Die stärkste Aufstellung lag über dem Cap. Diese hier ist die beste, die hineinpasst.</p>';
