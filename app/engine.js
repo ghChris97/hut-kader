@@ -304,7 +304,7 @@
     var dC = usable(combosFor(data, 'defense', opts.coach), dPool);
     return {
       w: opts.w || { ovr: 1, ap: 0.5, sal: 0.25 }, val: val, locks: locks, strict: strict,
-      dHand: opts.dHand || '', handBonus: opts.dHand ? (opts.handBonus != null ? opts.handBonus : 1.5) : 0,
+      dHand: opts.dHand || '', handBonus: opts.dHand ? (opts.handBonus != null ? opts.handBonus : 4) : 0,
       fPool: fPool, dPool: dPool, fC: fC, dC: dC, goalies: goalies,
       fCands: candidates(fPool, F_POS, strict, fC, val), dCands: candidates(dPool, D_POS, strict && !opts.dHand, dC, val),
       captain: null, capTeams: null, teamBonus: 0, owned: owned
