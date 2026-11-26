@@ -229,7 +229,7 @@
       }
     }
     t.avg = t.n ? t.ovrSum / t.n : 0;
-    t.raw = w.ovr * t.valSum + w.ap * t.ap + w.sal * t.salBoost + LOCK * t.locked + (ctx.handBonus || 0) * t.mixed - 0.01 * (t.backupSal || 0) + stickiness(res, ctx);
+    t.raw = w.ovr * t.valSum + w.ap * t.ap + w.sal * t.salBoost + LOCK * t.locked + (ctx.handBonus || 0) * t.mixed - 0.01 * (t.backupSal || 0) + stickiness(res, ctx) + posFit(res);
     return t;
   }
 
@@ -270,6 +270,13 @@
     }); });
     (prev.g || []).forEach(function (k, i) { inL[k] = 1; pos[k] = 'g' + i; });
     return { inL: inL, pair: pair, pos: pos };
+  }
+  /* Stuermer auf eigener Kartenposition: winziger Bonus (Summe mit Stabilitaet bleibt < 1 OVR) */
+  var POS_FIT = 0.04;
+  function posFit(res) {
+    var n = 0;
+    res.forwards.forEach(function (l) { var seen = {}; l.players.forEach(function (p) { if (F_POS.indexOf(p.pos) >= 0 && !seen[p.pos]) { seen[p.pos] = 1; n++; } }); });
+    return n * POS_FIT;
   }
   function stickiness(res, ctx) {
     var pv = ctx.prev; if (!pv) return 0;
@@ -684,6 +691,13 @@
     if ((mode === 'off' || mode === 'on') && ps.length === 2 && ps[0].hand !== ps[1].hand) {
       var leftHand = mode === 'off' ? 'R' : 'L';
       return ps[0].hand === leftHand ? ps : [ps[1], ps[0]];
+    }
+    /* Beide gleiche Schusshand: der Staerkere bekommt die gewuenschte Seite
+       (One-Timer: Linksschuetze rechts / eigene Seite: Linksschuetze links) */
+    if ((mode === 'off' || mode === 'on') && ps.length === 2 && ps[0].hand && ps[0].hand === ps[1].hand) {
+      var s2 = ps.slice().sort(function (a, b) { return b.ovr - a.ovr; });
+      var wantRight = (s2[0].hand === 'L') === (mode === 'off');
+      return wantRight ? [s2[1], s2[0]] : s2;
     }
     var order = ['LD', 'RD'], out = [null, null], rest = [];
     /* Der Staerkere bekommt seine Kartenposition, der andere weicht aus */
