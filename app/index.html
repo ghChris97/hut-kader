@@ -1449,7 +1449,7 @@ function pkRank(){
     var r2=HUT.optimize(D,owned().concat([c]),opts()), at=findSlot(r2,k), t1=base.totals, t2=r2.totals;
     var inA={}, inB={}; HUT.lineupPlayers(base).forEach(function(p){inA[key(p)]=p;}); HUT.lineupPlayers(r2).forEach(function(p){inB[key(p)]=p;});
     var outP=Object.keys(inA).filter(function(x){return !inB[x];}).map(function(x){return inA[x];});
-    out.push({c:c,at:at,out:outP,d:t2.raw-t1.raw,avg:t2.avg-t1.avg,ap:t2.ap-t1.ap,bo:t2.boostOvr-t1.boostOvr,capLost:!!(t1.captain&&t1.captain.active&&!(t2.captain&&t2.captain.active))});
+    out.push({c:c,at:at,out:outP,d:t2.raw-t1.raw,avg:t2.avg-t1.avg,ap:t2.ap-t1.ap,bo:t2.boostOvr-t1.boostOvr,mx:(t2.mixed||0)-(t1.mixed||0),capLost:!!(t1.captain&&t1.captain.active&&!(t2.captain&&t2.captain.active))});
   });
   out.sort(function(a,b){return (a.own?1:0)-(b.own?1:0)||b.d-a.d;});
   return out;
@@ -1467,8 +1467,8 @@ function pkHtml(){
       var where=x.own?'Hast du schon':!x.at?'Würde nicht spielen':(x.at.t==='f'?(x.at.i+1)+'. Sturmreihe':x.at.t==='d'?(x.at.i+1)+'. Verteidigungsreihe':(x.at.i?'Backup':'Starting')+'-Goalie')+(x.out&&x.out.length?' statt '+x.out.map(function(p){return esc(nice(p.n))+' ('+p.ovr+')';}).join(', '):' · füllt eine freie Stelle');
       var dd=function(v,dig){var s=(v>0?'+':'')+(dig?v.toFixed(dig):Math.round(v)); return '<b class="'+(v>0.0001?'up':v<-0.0001?'dn':'')+'">'+s.replace('.',',')+'</b>';};
       return '<div class="pkr'+(best?' best':'')+'"><button class="mc" data-card="'+k+'">'+img(c)+'</button><div class="pkrt"><div class="pkrn">'+(best?'<span class="recl">Empfehlung</span> ':'')+'<b>'+esc(nice(c.n))+'</b> <span class="mute">'+c.ovr+' · '+esc(c.pos)+'</span></div>'+
-        '<div class="small">'+where+'</div>'+(x.own||!x.at?'':'<div class="pkrs">Ø OVR '+dd(x.avg,1)+' · AP '+dd(x.ap)+' · OVR-Boni '+dd(x.bo)+(x.capLost?'<br><span class="dn">Captain-Bonus fällt weg</span>':'')+'</div>')+'</div></div>';
-    }).join('')+'<p class="small mute">Bewertet wird wie beim Optimierer (Priorität aus dem Setup): Stärke der Aufstellung, AP und Cap-Bonus. Tippe auf eine Karte für Details und „In meinen Reihen testen“.</p>';
+        '<div class="small">'+where+'</div>'+(x.own||!x.at?'':'<div class="pkrs">Ø OVR '+dd(x.avg,1)+' · AP '+dd(x.ap)+' · OVR-Boni '+dd(x.bo)+(x.mx>0?'<br><span class="up">+ Verteidigerpaar mit Links-/Rechtsschütze (One-Timer)</span>':x.mx<0?'<br><span class="dn">− Verteidigerpaar verliert Links-/Rechts-Mischung</span>':'')+(x.at&&x.at.t==='g'&&x.at.i?'<br><span class="mute">Backup-Goalie spielt kaum: zählt nur für Boni und Gehalt</span>':'')+(x.capLost?'<br><span class="dn">Captain-Bonus fällt weg</span>':'')+'</div>')+'</div></div>';
+    }).join('')+'<p class="small mute">Bewertet wird wie beim Optimierer (Priorität aus dem Setup): Stärke der Aufstellung, AP, Cap-Bonus und – wenn im Setup eingestellt – Schusshand der Verteidigerpaare. Tippe auf eine Karte für Details und „In meinen Reihen testen“.</p>';
   }
   return h;
 }
