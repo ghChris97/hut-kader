@@ -985,7 +985,7 @@ function sharedHtml(){
 function viewKader(){
   if(UI.imp){viewImport();return;}
   var o=owned(), h=sharedHtml();
-  var imp=SHARED?'':'<div class="actions"><button class="btn sm" id="imp-shot">'+IC.image+'Aus Bild einlesen</button><button class="btn ghost sm" id="imp-cam">'+IC.camera+'Foto aufnehmen</button><button class="btn ghost sm" id="imp-paste">'+IC.text+'Text einfügen</button>'+(o.length?'<button class="btn ghost sm" id="share">'+IC.share+'Kader teilen</button>':'')+'</div>';
+  var imp=SHARED?'':'<div class="actions"><button class="btn sm" id="imp-cam">'+IC.camera+'Foto aufnehmen</button><button class="btn ghost sm" id="imp-shot">'+IC.image+'Aus Bild einlesen</button><button class="btn ghost sm" id="imp-paste">'+IC.text+'Text einfügen</button>'+(o.length?'<button class="btn ghost sm" id="share">'+IC.share+'Kader teilen</button>':'')+'</div>';
   if(!o.length){view.innerHTML=h+'<div class="center"><div class="empty-ic">'+IC.people+'</div><h2>Dein Kader ist leer</h2><p class="mute" style="max-width:34ch">Lies deine Aufstellung aus einem Screenshot ein oder füge Karten unter „Karten" mit + hinzu.</p></div>'+imp;return;}
   var ns=newSince(), up=o.filter(function(c){return c.upd>ns;});
   h+=imp+'<div class="searchwrap">'+IC.search+'<input type="search" id="kq" placeholder="Im Kader suchen" aria-label="Im Kader suchen" value="'+esc(UI.kq||'')+'" autocomplete="off"></div>';
@@ -1458,7 +1458,7 @@ function pkHtml(){
   if(!owned().length) return '<p class="small mute">Lege zuerst deinen Kader an.</p>';
   var st=pkState(), h='';
   h+='<div class="pkcand">'+st.k.map(function(k,i){var c=byKey[k]; return c?'<div class="pkc2"><button class="mc" data-card="'+k+'">'+img(c)+'<i>'+c.ovr+'</i></button><button class="pkdel" data-pkdel="'+i+'" aria-label="'+esc(nice(c.n))+' entfernen">'+IC.x+'</button></div>':'';}).join('')+
-    '<button class="pkadd" id="pk-add"><span>+</span>Karte</button><label class="pkadd" for="pk-file"><span>'+IC.camera+'</span>Foto</label><input type="file" id="pk-file" accept="image/*" hidden></div>';
+    '<button class="pkadd" id="pk-add"><span>+</span>Karte</button><label class="pkadd" for="pk-cam"><span>'+IC.camera+'</span>Foto</label><input type="file" id="pk-cam" accept="image/*" capture="environment" hidden><label class="pkadd" for="pk-file"><span>'+IC.image+'</span>Bild</label><input type="file" id="pk-file" accept="image/*" hidden></div>';
   if(st.msg) h+='<p class="small mute">'+esc(st.msg)+'</p>';
   if(st.k.length>=2||st.res) h+='<p><button class="btn" id="pk-run" style="width:100%">Empfehlung berechnen</button></p>';
   if(st.res){
@@ -1488,7 +1488,7 @@ document.addEventListener('click',function(e){
   if(t.dataset.pkdel!=null){ st.k.splice(+t.dataset.pkdel,1); st.res=null; viewAnalyse(); return; }
   if(t.id==='pk-run'){ t.textContent='Rechne …'; setTimeout(function(){ st.res=pkRank(); st.msg=''; viewAnalyse(); },30); }
 },true);
-document.addEventListener('change',function(e){ if(e.target&&e.target.id==='pk-file'&&e.target.files[0]) pkScan(e.target.files[0]); },true);
+document.addEventListener('change',function(e){ if(e.target&&(e.target.id==='pk-file'||e.target.id==='pk-cam')&&e.target.files[0]) pkScan(e.target.files[0]); },true);
 /* Reihen-Baukasten: eine Reihe aus beliebigen Karten */
 function lbState(){ if(!UI.lb) UI.lb={t:'f',k:[null,null,null]}; return UI.lb; }
 function lbHtml(){
